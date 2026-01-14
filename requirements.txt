@@ -1,0 +1,6 @@
+Flask==3.0.0
+yfinance>=0.2.49
+pandas-ta==0.4.71b0
+pandas>=2.3.2
+pytz>=2024.1
+gunicorn>=21.0.0

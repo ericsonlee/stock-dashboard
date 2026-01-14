@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Dashboard - Indonesian Stocks</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        h1 {
+            color: #333;
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+
+        .header-controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .last-update {
+            display: inline-block;
+            background: #4CAF50;
+            color: white;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+
+        .refresh-btn {
+            background: #2196F3;
+            color: white;
+            border: none;
+            padding: 10px 25px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: background 0.3s;
+        }
+
+        .refresh-btn:hover {
+            background: #1976D2;
+        }
+
+        .refresh-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        /* Interval Selector */
+        .interval-selector {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: #f5f5f5;
+            padding: 8px 15px;
+            border-radius: 25px;
+        }
+
+        .interval-selector label {
+            font-weight: bold;
+            color: #555;
+            font-size: 0.9em;
+        }
+
+        .interval-buttons {
+            display: flex;
+            gap: 5px;
+        }
+
+        .interval-btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 15px;
+            cursor: pointer;
+            font-size: 0.85em;
+            font-weight: bold;
+            background: #ddd;
+            color: #555;
+            transition: all 0.2s;
+        }
+
+        .interval-btn:hover {
+            background: #bbb;
+        }
+
+        .interval-btn.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .interval-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Tab Styles */
+        .tabs-container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+
+        .tab-buttons {
+            display: flex;
+            background: #333;
+            overflow-x: auto;
+        }
+
+        .tab-btn {
+            padding: 18px 40px;
+            background: #333;
+            color: #aaa;
+            border: none;
+            cursor: pointer;
+            font-size: 1.1em;
+            font-weight: bold;
+            transition: all 0.3s;
+            border-bottom: 3px solid transparent;
+            white-space: nowrap;
+        }
+
+        .tab-btn:hover {
+            background: #444;
+            color: white;
+        }
+
+        .tab-btn.active {
+            background: #4CAF50;
+            color: white;
+            border-bottom: 3px solid #2E7D32;
+        }
+
+        .tab-content {
+            display: none;
+            padding: 25px;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .summary-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 12px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .stat-box {
+            text-align: center;
+            padding: 12px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .stat-label {
+            font-size: 0.8em;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .stat-value {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9em;
+        }
+
+        th {
+            background: #333;
+            color: white;
+            padding: 10px 8px;
+            text-align: left;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            white-space: nowrap;
+        }
+
+        td {
+            padding: 8px;
+            border-bottom: 1px solid #ddd;
+            white-space: nowrap;
+        }
+
+        tr:hover {
+            background: #f5f5f5;
+        }
+
+        /* Color classes for scores */
+        .score-positive {
+            background-color: #90EE90 !important;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        .score-negative {
+            background-color: #FFB6C6 !important;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        .score-neutral {
+            background-color: #FFFF99 !important;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        /* Indicator column styles */
+        .indicator-positive {
+            background-color: #4CAF50 !important;
+            color: white !important;
+            font-weight: bold;
+            text-align: center;
+            cursor: help;
+        }
+
+        .indicator-negative {
+            background-color: #f44336 !important;
+            color: white !important;
+            font-weight: bold;
+            text-align: center;
+            cursor: help;
+        }
+
+        .indicator-neutral {
+            background-color: #FFEB3B !important;
+            color: #333 !important;
+            font-weight: bold;
+            text-align: center;
+            cursor: help;
+        }
+
+        /* Color classes for Vol Osc Result */
+        .strong-bg {
+            background-color: #4CAF50 !important;
+            color: white !important;
+            font-weight: bold;
+        }
+
+        .accum-bg {
+            background-color: #2196F3 !important;
+            color: white !important;
+            font-weight: bold;
+        }
+
+        .bearish-indicator-bg {
+            background-color: #FF9800 !important;
+            color: white !important;
+            font-weight: bold;
+        }
+
+        .confirm-bearish-bg {
+            background-color: #f44336 !important;
+            color: white !important;
+            font-weight: bold;
+        }
+
+        .green-bg {
+            background-color: #90EE90 !important;
+            font-weight: bold;
+        }
+
+        .red-bg {
+            background-color: #FFB6C6 !important;
+            font-weight: bold;
+        }
+
+        .rsi-overbought {
+            background-color: #FFB6C6 !important;
+        }
+
+        .rsi-oversold {
+            background-color: #FFB6C6 !important;
+        }
+
+        .rsi-good {
+            background-color: #90EE90 !important;
+        }
+
+        .rsi-neutral {
+            background-color: #FFFF99 !important;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 50px;
+            font-size: 1.2em;
+            color: #666;
+        }
+
+        .error {
+            background: #f44336;
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+            font-size: 1.1em;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        /* Tooltip */
+        .tooltip {
+            position: relative;
+        }
+
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            width: 200px;
+            background-color: #333;
+            color: #fff;
+            text-align: left;
+            border-radius: 8px;
+            padding: 10px;
+            position: absolute;
+            z-index: 100;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -100px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 0.85em;
+            line-height: 1.5;
+        }
+
+        .tooltip .tooltiptext::after {
+            content: "";
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            margin-left: -5px;
+            border-width: 5px;
+            border-style: solid;
+            border-color: #333 transparent transparent transparent;
+        }
+
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        /* Legend */
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            padding: 15px;
+            background: #f0f0f0;
+            border-radius: 8px;
+            margin-top: 20px;
+            font-size: 0.85em;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .legend-color {
+            width: 18px;
+            height: 18px;
+            border-radius: 4px;
+        }
+
+        .legend-section {
+            width: 100%;
+            font-weight: bold;
+            margin-top: 10px;
+            padding-bottom: 5px;
+            border-bottom: 1px solid #ccc;
+        }
+
+        .legend-section:first-child {
+            margin-top: 0;
+        }
+
+        /* Current interval badge */
+        .current-interval-badge {
+            background: #667eea;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 15px;
+            font-size: 0.85em;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Indonesian Stock Dashboard</h1>
+
+            <div class="header-controls">
+                <div class="interval-selector">
+                    <label>Timeframe:</label>
+                    <div class="interval-buttons">
+                        {% for key, label in intervals.items() %}
+                        <button class="interval-btn {% if key == current_interval %}active{% endif %}"
+                                onclick="changeInterval('{{ key }}')"
+                                data-interval="{{ key }}">
+                            {{ key.upper() }}
+                        </button>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="last-update" id="lastUpdate">Loading...</div>
+                <span class="current-interval-badge" id="currentIntervalBadge">{{ current_interval.upper() }}</span>
+                <button class="refresh-btn" onclick="refreshData()">Refresh</button>
+            </div>
+        </header>
+
+        <div id="stocksContainer" class="tabs-container">
+            <div class="loading">
+                <div class="spinner"></div>
+                <p>Loading stock data...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let autoRefreshInterval;
+        let currentTab = null;
+        let currentTimeframe = '{{ current_interval }}';
+
+        // Change timeframe interval
+        async function changeInterval(interval) {
+            // Disable all buttons during loading
+            document.querySelectorAll('.interval-btn').forEach(btn => {
+                btn.disabled = true;
+            });
+
+            // Show loading state
+            document.getElementById('stocksContainer').innerHTML = `
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>Loading ${interval.toUpperCase()} data...</p>
+                </div>
+            `;
+
+            try {
+                const response = await fetch(`/api/set_interval/${interval}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    currentTimeframe = interval;
+                    updateIntervalButtons(interval);
+                    document.getElementById('currentIntervalBadge').textContent = interval.toUpperCase();
+                    await loadStockData();
+                } else {
+                    alert('Error changing interval: ' + data.error);
+                }
+            } catch (error) {
+                console.error('Error changing interval:', error);
+                alert('Error changing interval. Please try again.');
+            }
+
+            // Re-enable buttons
+            document.querySelectorAll('.interval-btn').forEach(btn => {
+                btn.disabled = false;
+            });
+        }
+
+        // Update interval button states
+        function updateIntervalButtons(activeInterval) {
+            document.querySelectorAll('.interval-btn').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.dataset.interval === activeInterval) {
+                    btn.classList.add('active');
+                }
+            });
+        }
+
+        // Fetch and display stock data
+        async function loadStockData() {
+            try {
+                const response = await fetch('/api/stocks');
+                const data = await response.json();
+
+                if (data.stocks && Object.keys(data.stocks).length > 0) {
+                    displayStocks(data.stocks);
+                    updateLastUpdateTime(data.last_update);
+                    if (data.current_interval) {
+                        currentTimeframe = data.current_interval;
+                        updateIntervalButtons(data.current_interval);
+                        document.getElementById('currentIntervalBadge').textContent = data.current_interval.toUpperCase();
+                    }
+                } else {
+                    document.getElementById('stocksContainer').innerHTML =
+                        '<div class="no-data">No stock data available. Please wait for the next update.</div>';
+                }
+            } catch (error) {
+                console.error('Error loading stock data:', error);
+                document.getElementById('stocksContainer').innerHTML =
+                    '<div class="error">Error loading stock data. Please refresh the page.</div>';
+            }
+        }
+
+        // Display stocks in tabs
+        function displayStocks(stocks) {
+            const container = document.getElementById('stocksContainer');
+            const tickers = Object.keys(stocks);
+
+            // Remember current tab or default to first
+            if (!currentTab || !tickers.includes(currentTab)) {
+                currentTab = tickers[0];
+            }
+
+            // Create tab buttons
+            let tabButtonsHTML = '<div class="tab-buttons">';
+            for (const ticker of tickers) {
+                const isActive = ticker === currentTab ? 'active' : '';
+                tabButtonsHTML += `<button class="tab-btn ${isActive}" onclick="switchTab('${ticker}')">${ticker.replace('.JK', '')}</button>`;
+            }
+            tabButtonsHTML += '</div>';
+
+            // Create tab contents
+            let tabContentsHTML = '';
+            for (const [ticker, stockInfo] of Object.entries(stocks)) {
+                const isActive = ticker === currentTab ? 'active' : '';
+                tabContentsHTML += createTabContent(ticker, stockInfo, isActive);
+            }
+
+            container.innerHTML = tabButtonsHTML + tabContentsHTML;
+        }
+
+        // Switch between tabs
+        function switchTab(ticker) {
+            currentTab = ticker;
+
+            // Update button states
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.textContent === ticker.replace('.JK', '')) {
+                    btn.classList.add('active');
+                }
+            });
+
+            // Update content visibility
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+                if (content.id === `tab-${ticker}`) {
+                    content.classList.add('active');
+                }
+            });
+        }
+
+        // Create tab content for a stock
+        function createTabContent(ticker, stockInfo, isActive) {
+            const latestData = stockInfo.data[stockInfo.data.length - 1];
+            const interval = stockInfo.interval || '1d';
+
+            // Create summary stats
+            const summaryHTML = `
+                <div class="summary-stats">
+                    <div class="stat-box">
+                        <div class="stat-label">Price</div>
+                        <div class="stat-value">${latestData.Price.toFixed(2)}</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">MA 5</div>
+                        <div class="stat-value" style="color: ${latestData.Score_MA5 > 0 ? '#4CAF50' : latestData.Score_MA5 < 0 ? '#f44336' : '#FFC107'}">${latestData.MA_5.toFixed(2)}</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">MA 10</div>
+                        <div class="stat-value" style="color: ${latestData.Score_MA10 > 0 ? '#4CAF50' : latestData.Score_MA10 < 0 ? '#f44336' : '#FFC107'}">${latestData.MA_10.toFixed(2)}</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">RSI</div>
+                        <div class="stat-value" style="color: ${latestData.Score_RSI > 0 ? '#4CAF50' : latestData.Score_RSI < 0 ? '#f44336' : '#FFC107'}">${latestData.RSI_Score.toFixed(2)}</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">SuperTrend</div>
+                        <div class="stat-value" style="color: ${latestData.SuperTrend_Color === 'GREEN' ? '#4CAF50' : '#f44336'}">${latestData.SuperTrend_Color}</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">Vol Osc</div>
+                        <div class="stat-value" style="color: ${getVolOscColor(latestData.Vol_Osc_Result)}">${latestData.Vol_Osc_Result}</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">Indicator</div>
+                        <div class="stat-value" style="color: ${latestData.Indicator > 0 ? '#4CAF50' : latestData.Indicator < 0 ? '#f44336' : '#FFC107'}; font-size: 1.5em;">${latestData.Indicator}</div>
+                    </div>
+                </div>
+            `;
+
+            // Create table
+            const tableHTML = `
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date/Time</th>
+                                <th>Price</th>
+                                <th>MA 5</th>
+                                <th>MA 10</th>
+                                <th>RSI</th>
+                                <th>SuperTrend</th>
+                                <th>Vol Osc %</th>
+                                <th>Vol Osc Result</th>
+                                <th>Indicator</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${stockInfo.data.map(row => `
+                                <tr>
+                                    <td>${row.Date}</td>
+                                    <td>${row.Price.toFixed(2)}</td>
+                                    <td class="${getScoreClass(row.Score_MA5)}">${row.MA_5.toFixed(2)}</td>
+                                    <td class="${getScoreClass(row.Score_MA10)}">${row.MA_10.toFixed(2)}</td>
+                                    <td class="${getRsiClass(row.RSI_Score, row.Score_RSI)}">${row.RSI_Score.toFixed(2)}</td>
+                                    <td class="${row.SuperTrend_Color === 'GREEN' ? 'green-bg' : 'red-bg'}">${row.SuperTrend} (${row.SuperTrend_Color})</td>
+                                    <td>${row.Vol_Osc.toFixed(2)}%</td>
+                                    <td class="${getVolOscClass(row.Vol_Osc_Result)}">${row.Vol_Osc_Result}</td>
+                                    <td class="${getIndicatorClass(row.Indicator)} tooltip">
+                                        ${row.Indicator}
+                                        <span class="tooltiptext">
+                                            <strong>Score Breakdown:</strong><br>
+                                            MA5: ${formatScore(row.Score_MA5)}<br>
+                                            MA10: ${formatScore(row.Score_MA10)}<br>
+                                            RSI: ${formatScore(row.Score_RSI)}<br>
+                                            SuperTrend: ${formatScore(row.Score_SuperTrend)}<br>
+                                            Vol Osc: ${formatScore(row.Score_VolOsc)}<br>
+                                            <strong>Total: ${row.Indicator}</strong>
+                                        </span>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="legend">
+                    <div class="legend-section">Scoring System (Green +1, Yellow 0, Red -1)</div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #90EE90;"></div>
+                        <span>MA5/MA10: Price > MA</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #FFB6C6;"></div>
+                        <span>MA5/MA10: Price < MA</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #90EE90;"></div>
+                        <span>RSI: 50-75 (Good)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #FFFF99;"></div>
+                        <span>RSI: 30-50 (Neutral)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #FFB6C6;"></div>
+                        <span>RSI: <=30 or >75</span>
+                    </div>
+
+                    <div class="legend-section">Vol Osc Result</div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #4CAF50;"></div>
+                        <span>STRONG (Price > MA, Vol +20%)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #2196F3;"></div>
+                        <span>ACCUM (Price < MA, Vol +20%)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #FF9800;"></div>
+                        <span>BEARISH INDICATOR (Price > MA, Vol -15%)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #f44336;"></div>
+                        <span>CONFIRM BEARISH (Price < MA, Vol -15%)</span>
+                    </div>
+                </div>
+            `;
+
+            return `
+                <div id="tab-${ticker}" class="tab-content ${isActive}">
+                    ${summaryHTML}
+                    ${tableHTML}
+                </div>
+            `;
+        }
+
+        // Format score with + or - sign
+        function formatScore(score) {
+            if (score > 0) return `+${score}`;
+            return score.toString();
+        }
+
+        // Get score CSS class
+        function getScoreClass(score) {
+            if (score > 0) return 'score-positive';
+            if (score < 0) return 'score-negative';
+            return 'score-neutral';
+        }
+
+        // Get Indicator CSS class
+        function getIndicatorClass(indicator) {
+            if (indicator > 0) return 'indicator-positive';
+            if (indicator < 0) return 'indicator-negative';
+            return 'indicator-neutral';
+        }
+
+        // Get Vol Osc Result CSS class
+        function getVolOscClass(result) {
+            switch(result) {
+                case 'STRONG': return 'strong-bg';
+                case 'ACCUM': return 'accum-bg';
+                case 'BEARISH INDICATOR': return 'bearish-indicator-bg';
+                case 'CONFIRM BEARISH': return 'confirm-bearish-bg';
+                case 'UP': return 'green-bg';
+                case 'DOWN': return 'red-bg';
+                default: return '';
+            }
+        }
+
+        // Get Vol Osc Result color for stat box
+        function getVolOscColor(result) {
+            switch(result) {
+                case 'STRONG': return '#4CAF50';
+                case 'ACCUM': return '#2196F3';
+                case 'BEARISH INDICATOR': return '#FF9800';
+                case 'CONFIRM BEARISH': return '#f44336';
+                case 'UP': return '#4CAF50';
+                case 'DOWN': return '#f44336';
+                default: return '#333';
+            }
+        }
+
+        // Get RSI CSS class based on score
+        function getRsiClass(rsi, score) {
+            if (score > 0) return 'rsi-good';
+            if (score < 0) return 'rsi-overbought';
+            return 'rsi-neutral';
+        }
+
+        // Update last update time
+        function updateLastUpdateTime(timestamp) {
+            const element = document.getElementById('lastUpdate');
+            if (timestamp) {
+                element.textContent = `Updated: ${timestamp}`;
+            }
+        }
+
+        // Refresh data manually
+        async function refreshData() {
+            const button = document.querySelector('.refresh-btn');
+            button.disabled = true;
+            button.textContent = 'Refreshing...';
+
+            try {
+                await fetch('/api/refresh');
+                await loadStockData();
+                button.textContent = 'Refreshed!';
+                setTimeout(() => {
+                    button.textContent = 'Refresh';
+                    button.disabled = false;
+                }, 2000);
+            } catch (error) {
+                console.error('Error refreshing data:', error);
+                button.textContent = 'Error';
+                setTimeout(() => {
+                    button.textContent = 'Refresh';
+                    button.disabled = false;
+                }, 2000);
+            }
+        }
+
+        // Auto-refresh every minute
+        function startAutoRefresh() {
+            autoRefreshInterval = setInterval(() => {
+                loadStockData();
+            }, 60000);
+        }
+
+        // Initial load
+        loadStockData();
+        startAutoRefresh();
+    </script>
+</body>
+</html>
