@@ -140,6 +140,7 @@
 
         .tab-btn {
             padding: 18px 40px;
+            padding-right: 35px;
             background: #333;
             color: #aaa;
             border: none;
@@ -149,6 +150,7 @@
             transition: all 0.3s;
             border-bottom: 3px solid transparent;
             white-space: nowrap;
+            position: relative;
         }
 
         .tab-btn:hover {
@@ -452,6 +454,118 @@
             font-size: 0.85em;
             font-weight: bold;
         }
+
+        /* Add stock input */
+        .add-stock-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: #f5f5f5;
+            padding: 8px 15px;
+            border-radius: 25px;
+        }
+
+        .add-stock-input {
+            border: 2px solid #ddd;
+            border-radius: 20px;
+            padding: 8px 15px;
+            font-size: 0.9em;
+            width: 150px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .add-stock-input:focus {
+            border-color: #667eea;
+        }
+
+        .add-stock-btn {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.9em;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+
+        .add-stock-btn:hover {
+            background: #388E3C;
+        }
+
+        .add-stock-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        /* Tab with delete button */
+        .tab-btn-wrapper {
+            display: flex;
+            align-items: center;
+            position: relative;
+        }
+
+        .tab-delete-btn {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(255,255,255,0.3);
+            border: none;
+            color: #fff;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 16px;
+            line-height: 1;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+        }
+
+        .tab-btn:hover .tab-delete-btn {
+            display: flex;
+        }
+
+        .tab-delete-btn:hover {
+            background: #f44336 !important;
+        }
+
+        /* Toast notification */
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            border-radius: 8px;
+            color: white;
+            font-weight: bold;
+            z-index: 1000;
+            animation: slideIn 0.3s ease;
+        }
+
+        .toast.success {
+            background: #4CAF50;
+        }
+
+        .toast.error {
+            background: #f44336;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
     </style>
 </head>
 <body>
@@ -471,6 +585,13 @@
                         </button>
                         {% endfor %}
                     </div>
+                </div>
+
+                <div class="add-stock-container">
+                    <input type="text" class="add-stock-input" id="addStockInput"
+                           placeholder="e.g., BBCA.JK, BTC-USD, AAPL"
+                           onkeypress="if(event.key==='Enter') addStock()">
+                    <button class="add-stock-btn" onclick="addStock()">Add</button>
                 </div>
 
                 <div class="last-update" id="lastUpdate">Loading...</div>
@@ -575,11 +696,18 @@
                 currentTab = tickers[0];
             }
 
-            // Create tab buttons
+            // Create tab buttons with delete buttons
             let tabButtonsHTML = '<div class="tab-buttons">';
             for (const ticker of tickers) {
                 const isActive = ticker === currentTab ? 'active' : '';
-                tabButtonsHTML += `<button class="tab-btn ${isActive}" onclick="switchTab('${ticker}')">${ticker.replace('.JK', '')}</button>`;
+                const showDelete = tickers.length > 1 ? '' : 'style="display:none !important;"';
+                tabButtonsHTML += `
+                    <div class="tab-btn-wrapper">
+                        <button class="tab-btn ${isActive}" onclick="switchTab('${ticker}')">
+                            ${ticker.replace('.JK', '')}
+                            <span class="tab-delete-btn" ${showDelete} onclick="event.stopPropagation(); removeStock('${ticker}')" title="Remove ${ticker}">&times;</span>
+                        </button>
+                    </div>`;
             }
             tabButtonsHTML += '</div>';
 
@@ -840,6 +968,86 @@
             autoRefreshInterval = setInterval(() => {
                 loadStockData();
             }, 60000);
+        }
+
+        // Add a new stock
+        async function addStock() {
+            const input = document.getElementById('addStockInput');
+            let ticker = input.value.trim().toUpperCase();
+
+            if (!ticker) {
+                showToast('Please enter a ticker symbol', 'error');
+                return;
+            }
+
+            const addBtn = document.querySelector('.add-stock-btn');
+            addBtn.disabled = true;
+            addBtn.textContent = 'Adding...';
+
+            try {
+                const response = await fetch(`/api/add_stock/${ticker}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    showToast(`${ticker} added successfully!`, 'success');
+                    input.value = '';
+                    currentTab = ticker; // Switch to newly added stock
+                    await loadStockData();
+                } else {
+                    showToast(data.error || 'Failed to add stock', 'error');
+                }
+            } catch (error) {
+                console.error('Error adding stock:', error);
+                showToast('Error adding stock. Please try again.', 'error');
+            }
+
+            addBtn.disabled = false;
+            addBtn.textContent = 'Add';
+        }
+
+        // Remove a stock
+        async function removeStock(ticker) {
+            if (!confirm(`Remove ${ticker} from the dashboard?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/remove_stock/${ticker}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    showToast(`${ticker} removed`, 'success');
+                    // If we removed the current tab, reset
+                    if (currentTab === ticker) {
+                        currentTab = null;
+                    }
+                    await loadStockData();
+                } else {
+                    showToast(data.error || 'Failed to remove stock', 'error');
+                }
+            } catch (error) {
+                console.error('Error removing stock:', error);
+                showToast('Error removing stock. Please try again.', 'error');
+            }
+        }
+
+        // Show toast notification
+        function showToast(message, type = 'success') {
+            // Remove any existing toast
+            const existingToast = document.querySelector('.toast');
+            if (existingToast) {
+                existingToast.remove();
+            }
+
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+
+            // Remove after 3 seconds
+            setTimeout(() => {
+                toast.remove();
+            }, 3000);
         }
 
         // Initial load

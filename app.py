@@ -171,6 +171,77 @@ def set_interval(interval):
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/api/add_stock/<ticker>')
+def add_stock(ticker):
+    """Add a new stock ticker"""
+    if not check_auth():
+        return jsonify({'error': 'Unauthorized'}), 401
+    global stock_data_cache
+
+    # Normalize ticker (uppercase)
+    ticker = ticker.upper()
+
+    # Check if already exists
+    if ticker in TICKERS:
+        return jsonify({'success': False, 'error': f'{ticker} already exists'}), 400
+
+    try:
+        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Adding stock {ticker}...")
+        data = fetcher.get_stock_data(ticker, bars=DEFAULT_BARS, interval=current_interval)
+
+        if data is None or data.empty:
+            return jsonify({'success': False, 'error': f'No data found for {ticker}. Check if the ticker is valid.'}), 404
+
+        # Add to tickers list and cache
+        TICKERS.append(ticker)
+        stock_data_cache[ticker] = {
+            'data': data.to_dict('records'),
+            'ticker': ticker,
+            'interval': current_interval,
+            'last_update': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        }
+
+        print(f"  ✓ Added {ticker}")
+        return jsonify({
+            'success': True,
+            'ticker': ticker,
+            'tickers': TICKERS
+        })
+    except Exception as e:
+        print(f"  ✗ Error adding {ticker}: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/remove_stock/<ticker>')
+def remove_stock(ticker):
+    """Remove a stock ticker"""
+    if not check_auth():
+        return jsonify({'error': 'Unauthorized'}), 401
+    global stock_data_cache
+
+    # Normalize ticker (uppercase)
+    ticker = ticker.upper()
+
+    if ticker not in TICKERS:
+        return jsonify({'success': False, 'error': f'{ticker} not found'}), 404
+
+    # Don't allow removing all stocks
+    if len(TICKERS) <= 1:
+        return jsonify({'success': False, 'error': 'Cannot remove the last stock'}), 400
+
+    try:
+        TICKERS.remove(ticker)
+        if ticker in stock_data_cache:
+            del stock_data_cache[ticker]
+
+        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Removed {ticker}")
+        return jsonify({
+            'success': True,
+            'ticker': ticker,
+            'tickers': TICKERS
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 # Initialize on startup (works with both direct run and gunicorn)
 def init_app():
     print("Performing initial data fetch...")
