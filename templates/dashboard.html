@@ -778,6 +778,10 @@
                         <div class="stat-label">Indicator</div>
                         <div class="stat-value" style="color: ${latestData.Indicator > 0 ? '#4CAF50' : latestData.Indicator < 0 ? '#f44336' : '#FFC107'}; font-size: 1.5em;">${latestData.Indicator}</div>
                     </div>
+                    <div class="stat-box">
+                        <div class="stat-label">Diff (T-1)</div>
+                        <div class="stat-value" style="color: ${latestData.Indicator_Diff > 0 ? '#4CAF50' : latestData.Indicator_Diff < 0 ? '#f44336' : '#FFC107'}; font-size: 1.5em;">${latestData.Indicator_Diff > 0 ? '+' : ''}${latestData.Indicator_Diff}</div>
+                    </div>
                 </div>
             `;
 
@@ -796,6 +800,7 @@
                                 <th>Vol Osc %</th>
                                 <th>Vol Osc Result</th>
                                 <th>Indicator</th>
+                                <th>Diff</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -821,6 +826,7 @@
                                             <strong>Total: ${row.Indicator}</strong>
                                         </span>
                                     </td>
+                                    <td class="${getIndicatorDiffClass(row.Indicator_Diff)}">${row.Indicator_Diff > 0 ? '+' : ''}${row.Indicator_Diff}</td>
                                 </tr>
                             `).join('')}
                         </tbody>
@@ -895,6 +901,13 @@
         function getIndicatorClass(indicator) {
             if (indicator > 0) return 'indicator-positive';
             if (indicator < 0) return 'indicator-negative';
+            return 'indicator-neutral';
+        }
+
+        // Get Indicator Diff CSS class
+        function getIndicatorDiffClass(diff) {
+            if (diff > 0) return 'indicator-positive';
+            if (diff < 0) return 'indicator-negative';
             return 'indicator-neutral';
         }
 

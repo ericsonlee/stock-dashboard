@@ -199,13 +199,16 @@ class StockDataFetcher:
             # Total Indicator Score (sum of all scores)
             df['Indicator'] = df['Score_MA5'] + df['Score_MA10'] + df['Score_RSI'] + df['Score_SuperTrend'] + df['Score_VolOsc']
 
+            # Indicator Diff (difference with T-1)
+            df['Indicator_Diff'] = df['Indicator'].diff().fillna(0).astype(int)
+
             # Select relevant columns and last N days
             final_cols = [
                 'Price', 'MA_5', 'MA_10', 'RSI_Score',
                 'SuperTrend', 'SuperTrend_Color',
                 'Vol_Osc', 'Vol_Osc_Result',
                 'Score_MA5', 'Score_MA10', 'Score_RSI', 'Score_SuperTrend', 'Score_VolOsc',
-                'Indicator'
+                'Indicator', 'Indicator_Diff'
             ]
 
             result_df = df[final_cols].tail(bars).copy()
