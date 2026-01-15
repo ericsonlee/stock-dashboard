@@ -17,12 +17,32 @@ stock_data_cache = {}
 last_update_time = None
 current_interval = '1h'  # Default interval (1h works better on Railway)
 
+# Live Monitor cache (to reduce API calls)
+live_monitor_cache = {
+    'data': None,
+    'last_update': None,
+    'cache_duration': 120  # Cache for 2 minutes
+}
+
 # Indonesian timezone (WIB = UTC+7)
 WIB = pytz.timezone('Asia/Jakarta')
 
 def get_wib_time():
     """Get current time in Indonesian timezone (WIB)"""
     return datetime.now(WIB).strftime('%Y-%m-%d %H:%M:%S')
+
+def is_trading_hours():
+    """Check if current time is within Indonesian trading hours (9:00-16:00 WIB, Mon-Fri)"""
+    now = datetime.now(WIB)
+    day = now.weekday()  # 0=Monday, 6=Sunday
+    hour = now.hour
+
+    # Check if weekday (Mon-Fri = 0-4)
+    if day > 4:  # Saturday or Sunday
+        return False
+
+    # Check if within 9:00-16:00 WIB
+    return 9 <= hour < 16
 
 # Configuration
 TICKERS = ["RATU.JK", "IMPC.JK", "BKSL.JK"]
@@ -68,16 +88,19 @@ def fetch_all_stocks(interval='1d', bars=DEFAULT_BARS):
     last_update_time = get_wib_time()
 
 def update_stock_data():
-    """Background thread to update stock data periodically"""
+    """Background thread to update stock data periodically (only during trading hours)"""
     global stock_data_cache, last_update_time, current_interval
 
     while True:
-        try:
-            print(f"[{get_wib_time()}] Updating stock data ({current_interval})...")
-            fetch_all_stocks(interval=current_interval, bars=DEFAULT_BARS)
-            print(f"[{last_update_time}] Stock data update complete\n")
-        except Exception as e:
-            print(f"Error in update thread: {e}")
+        if is_trading_hours():
+            try:
+                print(f"[{get_wib_time()}] Updating stock data ({current_interval})...")
+                fetch_all_stocks(interval=current_interval, bars=DEFAULT_BARS)
+                print(f"[{last_update_time}] Stock data update complete\n")
+            except Exception as e:
+                print(f"Error in update thread: {e}")
+        else:
+            print(f"[{get_wib_time()}] Outside trading hours, skipping background update")
 
         time.sleep(UPDATE_INTERVAL)
 
@@ -252,11 +275,22 @@ def remove_stock(ticker):
 
 @app.route('/api/live_monitor')
 def get_live_monitor_data():
-    """API endpoint for Live Monitor - returns 1D signals + 5M live data"""
+    """API endpoint for Live Monitor - returns 1D signals + 5M live data (cached for 2 min)"""
     if not check_auth():
         return jsonify({'error': 'Unauthorized'}), 401
 
-    print(f"[{get_wib_time()}] Fetching Live Monitor data...")
+    global live_monitor_cache
+
+    # Check if cache is still valid
+    now = datetime.now(WIB)
+    if (live_monitor_cache['data'] is not None and
+        live_monitor_cache['last_update'] is not None):
+        cache_age = (now - live_monitor_cache['last_update']).total_seconds()
+        if cache_age < live_monitor_cache['cache_duration']:
+            print(f"[{get_wib_time()}] Returning cached Live Monitor data (age: {cache_age:.0f}s)")
+            return jsonify(live_monitor_cache['data'])
+
+    print(f"[{get_wib_time()}] Fetching fresh Live Monitor data...")
 
     daily_signals = {}
     live_data = {}
@@ -306,12 +340,18 @@ def get_live_monitor_data():
             daily_signals[ticker] = {'indicator': 0, 'indicator_diff': 0, 'price': 0, 'date': 'N/A', 'error': str(e)}
             live_data[ticker] = {'data': [], 'ticker': ticker, 'interval': '5m', 'error': str(e)}
 
-    return jsonify({
+    response_data = {
         'daily_signals': daily_signals,
         'live_data': live_data,
         'tickers': TICKERS,
         'last_update': get_wib_time()
-    })
+    }
+
+    # Update cache
+    live_monitor_cache['data'] = response_data
+    live_monitor_cache['last_update'] = now
+
+    return jsonify(response_data)
 
 # Initialize on startup (works with both direct run and gunicorn)
 def init_app():

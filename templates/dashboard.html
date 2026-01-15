@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stock Dashboard - Indonesian Stocks</title>
+    <title>My Dashboard</title>
     <style>
         * {
             margin: 0;
@@ -23,39 +23,102 @@
             margin: 0 auto;
         }
 
-        header {
-            background: white;
-            padding: 25px;
-            border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-            margin-bottom: 30px;
-            text-align: center;
+        /* Navbar */
+        .navbar {
+            background: #1a1a2e;
+            padding: 0;
+            border-radius: 15px 15px 0 0;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+            margin-bottom: 0;
         }
 
-        h1 {
-            color: #333;
-            font-size: 2em;
-            margin-bottom: 10px;
-        }
-
-        .header-controls {
+        .navbar-top {
             display: flex;
-            justify-content: center;
+            justify-content: space-between;
             align-items: center;
-            flex-wrap: wrap;
+            padding: 15px 25px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .navbar-brand {
+            color: white;
+            font-size: 1.4em;
+            font-weight: bold;
+            margin: 0;
+        }
+
+        .navbar-status {
+            display: flex;
+            align-items: center;
             gap: 15px;
-            margin-top: 15px;
         }
 
         .last-update {
-            display: inline-block;
-            background: #4CAF50;
-            color: white;
-            padding: 8px 20px;
-            border-radius: 20px;
-            font-weight: bold;
-            font-size: 0.9em;
+            background: rgba(76, 175, 80, 0.2);
+            color: #4CAF50;
+            padding: 8px 15px;
+            border-radius: 8px;
+            font-weight: 500;
+            font-size: 0.85em;
+            border: 1px solid rgba(76, 175, 80, 0.3);
         }
+
+        .navbar-menu {
+            display: flex;
+            padding: 0 15px;
+        }
+
+        .nav-item {
+            padding: 15px 25px;
+            color: #aaa;
+            font-weight: 600;
+            font-size: 0.95em;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: all 0.2s;
+            background: none;
+            border-top: none;
+            border-left: none;
+            border-right: none;
+        }
+
+        .nav-item:hover {
+            color: white;
+            background: rgba(255,255,255,0.05);
+        }
+
+        .nav-item.active {
+            color: white;
+            border-bottom: 3px solid #667eea;
+            background: rgba(102, 126, 234, 0.1);
+        }
+
+        /* Toolbar below navbar */
+        .toolbar {
+            background: white;
+            padding: 15px 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-radius: 0 0 15px 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .toolbar-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .toolbar-right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
 
         .refresh-btn {
             background: #2196F3;
@@ -445,16 +508,6 @@
             margin-top: 0;
         }
 
-        /* Current interval badge */
-        .current-interval-badge {
-            background: #667eea;
-            color: white;
-            padding: 5px 15px;
-            border-radius: 15px;
-            font-size: 0.85em;
-            font-weight: bold;
-        }
-
         /* Add stock input */
         .add-stock-container {
             display: flex;
@@ -567,34 +620,13 @@
             }
         }
 
-        /* Mode Toggle */
+        /* Mode Toggle - now uses nav-item styling */
         .mode-toggle {
-            display: flex;
-            gap: 5px;
-            background: #333;
-            padding: 5px;
-            border-radius: 25px;
+            display: none; /* Hidden, using navbar-menu instead */
         }
 
         .mode-btn {
-            padding: 10px 20px;
-            border: none;
-            border-radius: 20px;
-            cursor: pointer;
-            font-size: 0.9em;
-            font-weight: bold;
-            background: transparent;
-            color: #aaa;
-            transition: all 0.2s;
-        }
-
-        .mode-btn:hover {
-            color: white;
-        }
-
-        .mode-btn.active {
-            background: #667eea;
-            color: white;
+            display: none;
         }
 
         /* Daily Signal Banner */
@@ -743,19 +775,46 @@
             color: #f44336;
             font-size: 0.8em;
         }
+
+        /* Ticker heading */
+        .ticker-heading {
+            color: #333;
+            font-size: 1.5em;
+            font-weight: bold;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <header>
-            <h1>Indonesian Stock Dashboard</h1>
-
-            <div class="header-controls">
-                <div class="mode-toggle">
-                    <button class="mode-btn active" id="dashboardModeBtn" onclick="switchMode('dashboard')">Dashboard</button>
-                    <button class="mode-btn" id="liveMonitorModeBtn" onclick="switchMode('live')">Live Monitor</button>
+        <!-- Navbar -->
+        <nav class="navbar">
+            <div class="navbar-top">
+                <h1 class="navbar-brand">My Dashboard</h1>
+                <div class="navbar-status">
+                    <div class="last-update" id="lastUpdate">Loading...</div>
                 </div>
+            </div>
+            <div class="navbar-menu">
+                <button class="nav-item active" id="dashboardModeBtn" onclick="switchMode('dashboard')">Dashboard</button>
+                <button class="nav-item" id="liveMonitorModeBtn" onclick="switchMode('live')">Live Monitor</button>
+                <!-- Add more menu items here in the future -->
+            </div>
+        </nav>
 
+        <!-- Toolbar -->
+        <div class="toolbar">
+            <div class="toolbar-left">
+                <div class="add-stock-container">
+                    <input type="text" class="add-stock-input" id="addStockInput"
+                           placeholder="e.g., BBCA.JK, BTC-USD, AAPL"
+                           onkeypress="if(event.key==='Enter') addStock()">
+                    <button class="add-stock-btn" onclick="addStock()">Add</button>
+                </div>
+            </div>
+            <div class="toolbar-right">
                 <div class="interval-selector" id="intervalSelector">
                     <label>Timeframe:</label>
                     <div class="interval-buttons">
@@ -768,19 +827,9 @@
                         {% endfor %}
                     </div>
                 </div>
-
-                <div class="add-stock-container">
-                    <input type="text" class="add-stock-input" id="addStockInput"
-                           placeholder="e.g., BBCA.JK, BTC-USD, AAPL"
-                           onkeypress="if(event.key==='Enter') addStock()">
-                    <button class="add-stock-btn" onclick="addStock()">Add</button>
-                </div>
-
-                <div class="last-update" id="lastUpdate">Loading...</div>
-                <span class="current-interval-badge" id="currentIntervalBadge">{{ current_interval.upper() }}</span>
                 <button class="refresh-btn" onclick="refreshData()">Refresh</button>
             </div>
-        </header>
+        </div>
 
         <div id="stocksContainer" class="tabs-container">
             <div class="loading">
@@ -806,13 +855,6 @@
 
             // Show/hide interval selector (only for dashboard mode)
             document.getElementById('intervalSelector').style.display = mode === 'dashboard' ? 'flex' : 'none';
-
-            // Update badge
-            if (mode === 'live') {
-                document.getElementById('currentIntervalBadge').textContent = '1D + 5M';
-            } else {
-                document.getElementById('currentIntervalBadge').textContent = currentTimeframe.toUpperCase();
-            }
 
             // Load appropriate data
             if (mode === 'live') {
@@ -908,7 +950,7 @@
                 const isActive = ticker === currentTab ? 'active' : '';
                 tabButtonsHTML += `
                     <div class="tab-btn-wrapper">
-                        <button class="tab-btn ${isActive}" onclick="switchTab('${ticker}')">
+                        <button class="tab-btn ${isActive}" data-ticker="${ticker}" onclick="switchTab('${ticker}')">
                             ${ticker.replace('.JK', '')}
                         </button>
                     </div>`;
@@ -969,7 +1011,6 @@
                 if (data.success) {
                     currentTimeframe = interval;
                     updateIntervalButtons(interval);
-                    document.getElementById('currentIntervalBadge').textContent = interval.toUpperCase();
                     await loadStockData();
                 } else {
                     alert('Error changing interval: ' + data.error);
@@ -1007,7 +1048,6 @@
                     if (data.current_interval) {
                         currentTimeframe = data.current_interval;
                         updateIntervalButtons(data.current_interval);
-                        document.getElementById('currentIntervalBadge').textContent = data.current_interval.toUpperCase();
                     }
                 } else {
                     document.getElementById('stocksContainer').innerHTML =
@@ -1037,7 +1077,7 @@
                 const showDelete = tickers.length > 1 ? '' : 'style="display:none !important;"';
                 tabButtonsHTML += `
                     <div class="tab-btn-wrapper">
-                        <button class="tab-btn ${isActive}" onclick="switchTab('${ticker}')">
+                        <button class="tab-btn ${isActive}" data-ticker="${ticker}" onclick="switchTab('${ticker}')">
                             ${ticker.replace('.JK', '')}
                             <span class="tab-delete-btn" ${showDelete} onclick="event.stopPropagation(); removeStock('${ticker}')" title="Remove ${ticker}">&times;</span>
                         </button>
@@ -1059,10 +1099,10 @@
         function switchTab(ticker) {
             currentTab = ticker;
 
-            // Update button states
+            // Update button states using data-ticker attribute
             document.querySelectorAll('.tab-btn').forEach(btn => {
                 btn.classList.remove('active');
-                if (btn.textContent === ticker.replace('.JK', '')) {
+                if (btn.dataset.ticker === ticker) {
                     btn.classList.add('active');
                 }
             });
@@ -1074,6 +1114,12 @@
                     content.classList.add('active');
                 }
             });
+
+            // Update current ticker heading if it exists
+            const tickerHeading = document.getElementById('currentTickerHeading');
+            if (tickerHeading) {
+                tickerHeading.textContent = ticker;
+            }
         }
 
         // Create tab content for a stock
@@ -1081,8 +1127,14 @@
             const latestData = stockInfo.data[stockInfo.data.length - 1];
             const interval = stockInfo.interval || '1d';
 
+            // Create ticker heading
+            const tickerHeadingHTML = `
+                <h2 class="ticker-heading" id="tickerHeading-${ticker}">${ticker}</h2>
+            `;
+
             // Create summary stats
             const summaryHTML = `
+                ${tickerHeadingHTML}
                 <div class="summary-stats">
                     <div class="stat-box">
                         <div class="stat-label">Price</div>
@@ -1314,15 +1366,44 @@
             }
         }
 
-        // Auto-refresh every minute
+        // Check if current time is within Indonesian trading hours (9:00-16:00 WIB, Mon-Fri)
+        function isTradingHours() {
+            // Get current time in WIB (UTC+7)
+            const now = new Date();
+            const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+            const wibTime = new Date(utc + (7 * 3600000)); // UTC+7
+
+            const day = wibTime.getDay(); // 0=Sunday, 6=Saturday
+            const hour = wibTime.getHours();
+            const minute = wibTime.getMinutes();
+
+            // Check if weekday (Mon-Fri = 1-5)
+            if (day === 0 || day === 6) {
+                return false;
+            }
+
+            // Check if within 9:00-16:00 WIB
+            const timeInMinutes = hour * 60 + minute;
+            const marketOpen = 9 * 60;   // 9:00
+            const marketClose = 16 * 60; // 16:00
+
+            return timeInMinutes >= marketOpen && timeInMinutes < marketClose;
+        }
+
+        // Auto-refresh every 2 minutes, only during trading hours
         function startAutoRefresh() {
             autoRefreshInterval = setInterval(() => {
-                if (currentMode === 'live') {
-                    loadLiveMonitorData();
+                if (isTradingHours()) {
+                    console.log('Auto-refresh: Trading hours active, refreshing...');
+                    if (currentMode === 'live') {
+                        loadLiveMonitorData();
+                    } else {
+                        loadStockData();
+                    }
                 } else {
-                    loadStockData();
+                    console.log('Auto-refresh: Outside trading hours, skipping refresh');
                 }
-            }, 60000);
+            }, 120000); // 2 minutes
         }
 
         // Add a new stock
@@ -1405,9 +1486,18 @@
             }, 3000);
         }
 
-        // Initial load
-        loadStockData();
-        startAutoRefresh();
+        // Initial load - ensure dashboard mode is active
+        document.addEventListener('DOMContentLoaded', function() {
+            // Reset to dashboard mode on page load
+            currentMode = 'dashboard';
+            document.getElementById('dashboardModeBtn').classList.add('active');
+            document.getElementById('liveMonitorModeBtn').classList.remove('active');
+            document.getElementById('intervalSelector').style.display = 'flex';
+
+            // Load dashboard data
+            loadStockData();
+            startAutoRefresh();
+        });
     </script>
 </body>
 </html>
