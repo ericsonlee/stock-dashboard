@@ -3,6 +3,7 @@ import threading
 import time
 import os
 from datetime import datetime
+import pytz
 from stock_fetcher import StockDataFetcher
 
 app = Flask(__name__)
@@ -15,6 +16,13 @@ ACCESS_CODE = os.environ.get('ACCESS_CODE', 'saham123')
 stock_data_cache = {}
 last_update_time = None
 current_interval = '1d'  # Default interval
+
+# Indonesian timezone (WIB = UTC+7)
+WIB = pytz.timezone('Asia/Jakarta')
+
+def get_wib_time():
+    """Get current time in Indonesian timezone (WIB)"""
+    return datetime.now(WIB).strftime('%Y-%m-%d %H:%M:%S')
 
 # Configuration
 TICKERS = ["RATU.JK", "IMPC.JK", "BKSL.JK"]
@@ -49,7 +57,7 @@ def fetch_all_stocks(interval='1d', bars=DEFAULT_BARS):
                     'data': data.to_dict('records'),
                     'ticker': ticker,
                     'interval': interval,
-                    'last_update': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    'last_update': get_wib_time()
                 }
                 print(f"  ✓ Updated {ticker} ({interval})")
             else:
@@ -57,7 +65,7 @@ def fetch_all_stocks(interval='1d', bars=DEFAULT_BARS):
         except Exception as e:
             print(f"  ✗ Error fetching {ticker}: {e}")
 
-    last_update_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    last_update_time = get_wib_time()
 
 def update_stock_data():
     """Background thread to update stock data periodically"""
@@ -65,7 +73,7 @@ def update_stock_data():
 
     while True:
         try:
-            print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Updating stock data ({current_interval})...")
+            print(f"[{get_wib_time()}] Updating stock data ({current_interval})...")
             fetch_all_stocks(interval=current_interval, bars=DEFAULT_BARS)
             print(f"[{last_update_time}] Stock data update complete\n")
         except Exception as e:
@@ -140,7 +148,7 @@ def refresh_data():
     bars = int(request.args.get('bars', DEFAULT_BARS))
 
     try:
-        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Manual refresh ({interval})...")
+        print(f"[{get_wib_time()}] Manual refresh ({interval})...")
         fetch_all_stocks(interval=interval, bars=bars)
         return jsonify({
             'success': True,
@@ -161,7 +169,7 @@ def set_interval(interval):
         return jsonify({'error': f'Invalid interval. Choose from: {list(INTERVALS.keys())}'}), 400
 
     try:
-        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Changing interval to {interval}...")
+        print(f"[{get_wib_time()}] Changing interval to {interval}...")
         fetch_all_stocks(interval=interval, bars=DEFAULT_BARS)
         return jsonify({
             'success': True,
@@ -186,7 +194,7 @@ def add_stock(ticker):
         return jsonify({'success': False, 'error': f'{ticker} already exists'}), 400
 
     try:
-        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Adding stock {ticker}...")
+        print(f"[{get_wib_time()}] Adding stock {ticker}...")
         data = fetcher.get_stock_data(ticker, bars=DEFAULT_BARS, interval=current_interval)
 
         if data is None or data.empty:
@@ -198,7 +206,7 @@ def add_stock(ticker):
             'data': data.to_dict('records'),
             'ticker': ticker,
             'interval': current_interval,
-            'last_update': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            'last_update': get_wib_time()
         }
 
         print(f"  ✓ Added {ticker}")
@@ -233,7 +241,7 @@ def remove_stock(ticker):
         if ticker in stock_data_cache:
             del stock_data_cache[ticker]
 
-        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Removed {ticker}")
+        print(f"[{get_wib_time()}] Removed {ticker}")
         return jsonify({
             'success': True,
             'ticker': ticker,
