@@ -250,6 +250,69 @@ def remove_stock(ticker):
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/api/live_monitor')
+def get_live_monitor_data():
+    """API endpoint for Live Monitor - returns 1D signals + 5M live data"""
+    if not check_auth():
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    print(f"[{get_wib_time()}] Fetching Live Monitor data...")
+
+    daily_signals = {}
+    live_data = {}
+
+    for ticker in TICKERS:
+        try:
+            # Fetch 1D data for signals (just need latest row)
+            daily_df = fetcher.get_stock_data(ticker, bars=5, interval='1d')
+            if daily_df is not None and not daily_df.empty:
+                latest_daily = daily_df.iloc[-1].to_dict()
+                daily_signals[ticker] = {
+                    'indicator': latest_daily.get('Indicator', 0),
+                    'indicator_diff': latest_daily.get('Indicator_Diff', 0),
+                    'price': latest_daily.get('Price', 0),
+                    'date': latest_daily.get('Date', 'N/A')
+                }
+            else:
+                daily_signals[ticker] = {
+                    'indicator': 0,
+                    'indicator_diff': 0,
+                    'price': 0,
+                    'date': 'N/A',
+                    'error': 'No daily data'
+                }
+
+            # Fetch 5M data for live monitoring
+            live_df = fetcher.get_stock_data(ticker, bars=30, interval='5m')
+            if live_df is not None and not live_df.empty:
+                live_data[ticker] = {
+                    'data': live_df.to_dict('records'),
+                    'ticker': ticker,
+                    'interval': '5m',
+                    'last_update': get_wib_time()
+                }
+            else:
+                live_data[ticker] = {
+                    'data': [],
+                    'ticker': ticker,
+                    'interval': '5m',
+                    'last_update': get_wib_time(),
+                    'error': 'No 5M data'
+                }
+
+            print(f"  ✓ Live Monitor: {ticker}")
+        except Exception as e:
+            print(f"  ✗ Live Monitor error {ticker}: {e}")
+            daily_signals[ticker] = {'indicator': 0, 'indicator_diff': 0, 'price': 0, 'date': 'N/A', 'error': str(e)}
+            live_data[ticker] = {'data': [], 'ticker': ticker, 'interval': '5m', 'error': str(e)}
+
+    return jsonify({
+        'daily_signals': daily_signals,
+        'live_data': live_data,
+        'tickers': TICKERS,
+        'last_update': get_wib_time()
+    })
+
 # Initialize on startup (works with both direct run and gunicorn)
 def init_app():
     print("Performing initial data fetch...")

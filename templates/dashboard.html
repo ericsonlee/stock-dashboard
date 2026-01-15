@@ -566,6 +566,183 @@
                 opacity: 1;
             }
         }
+
+        /* Mode Toggle */
+        .mode-toggle {
+            display: flex;
+            gap: 5px;
+            background: #333;
+            padding: 5px;
+            border-radius: 25px;
+        }
+
+        .mode-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.9em;
+            font-weight: bold;
+            background: transparent;
+            color: #aaa;
+            transition: all 0.2s;
+        }
+
+        .mode-btn:hover {
+            color: white;
+        }
+
+        .mode-btn.active {
+            background: #667eea;
+            color: white;
+        }
+
+        /* Daily Signal Banner */
+        .daily-signals-banner {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+        }
+
+        .daily-signals-title {
+            color: #fff;
+            font-size: 1.1em;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .daily-signals-title .badge {
+            background: #667eea;
+            padding: 3px 10px;
+            border-radius: 10px;
+            font-size: 0.8em;
+        }
+
+        .signal-cards {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .signal-card {
+            background: rgba(255,255,255,0.1);
+            border-radius: 12px;
+            padding: 15px 25px;
+            min-width: 150px;
+            text-align: center;
+            border: 2px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .signal-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        .signal-card.buy {
+            border-color: #4CAF50;
+            background: rgba(76, 175, 80, 0.2);
+        }
+
+        .signal-card.sell {
+            border-color: #f44336;
+            background: rgba(244, 67, 54, 0.2);
+        }
+
+        .signal-card.hold {
+            border-color: #FFC107;
+            background: rgba(255, 193, 7, 0.2);
+        }
+
+        .signal-ticker {
+            color: #fff;
+            font-size: 1.1em;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        .signal-action {
+            font-size: 1.4em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .signal-card.buy .signal-action {
+            color: #4CAF50;
+        }
+
+        .signal-card.sell .signal-action {
+            color: #f44336;
+        }
+
+        .signal-card.hold .signal-action {
+            color: #FFC107;
+        }
+
+        .signal-diff {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #fff;
+        }
+
+        .signal-price {
+            color: #aaa;
+            font-size: 0.85em;
+            margin-top: 5px;
+        }
+
+        .signal-date {
+            color: #666;
+            font-size: 0.75em;
+            margin-top: 3px;
+        }
+
+        /* Live data section */
+        .live-data-section {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+
+        .live-data-header {
+            background: #333;
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .live-data-title {
+            font-size: 1.1em;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .live-badge {
+            background: #f44336;
+            padding: 3px 10px;
+            border-radius: 10px;
+            font-size: 0.75em;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .signal-error {
+            color: #f44336;
+            font-size: 0.8em;
+        }
     </style>
 </head>
 <body>
@@ -574,7 +751,12 @@
             <h1>Indonesian Stock Dashboard</h1>
 
             <div class="header-controls">
-                <div class="interval-selector">
+                <div class="mode-toggle">
+                    <button class="mode-btn active" id="dashboardModeBtn" onclick="switchMode('dashboard')">Dashboard</button>
+                    <button class="mode-btn" id="liveMonitorModeBtn" onclick="switchMode('live')">Live Monitor</button>
+                </div>
+
+                <div class="interval-selector" id="intervalSelector">
                     <label>Timeframe:</label>
                     <div class="interval-buttons">
                         {% for key, label in intervals.items() %}
@@ -612,6 +794,158 @@
         let autoRefreshInterval;
         let currentTab = null;
         let currentTimeframe = '{{ current_interval }}';
+        let currentMode = 'dashboard'; // 'dashboard' or 'live'
+
+        // Switch between Dashboard and Live Monitor modes
+        async function switchMode(mode) {
+            currentMode = mode;
+
+            // Update mode buttons
+            document.getElementById('dashboardModeBtn').classList.toggle('active', mode === 'dashboard');
+            document.getElementById('liveMonitorModeBtn').classList.toggle('active', mode === 'live');
+
+            // Show/hide interval selector (only for dashboard mode)
+            document.getElementById('intervalSelector').style.display = mode === 'dashboard' ? 'flex' : 'none';
+
+            // Update badge
+            if (mode === 'live') {
+                document.getElementById('currentIntervalBadge').textContent = '1D + 5M';
+            } else {
+                document.getElementById('currentIntervalBadge').textContent = currentTimeframe.toUpperCase();
+            }
+
+            // Load appropriate data
+            if (mode === 'live') {
+                await loadLiveMonitorData();
+            } else {
+                await loadStockData();
+            }
+        }
+
+        // Load Live Monitor data (1D signals + 5M live)
+        async function loadLiveMonitorData() {
+            const container = document.getElementById('stocksContainer');
+            container.innerHTML = `
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>Loading Live Monitor data (1D signals + 5M live)...</p>
+                </div>
+            `;
+
+            try {
+                const response = await fetch('/api/live_monitor');
+                const data = await response.json();
+
+                if (data.daily_signals && data.live_data) {
+                    displayLiveMonitor(data);
+                    updateLastUpdateTime(data.last_update);
+                } else {
+                    container.innerHTML = '<div class="error">Error loading Live Monitor data.</div>';
+                }
+            } catch (error) {
+                console.error('Error loading live monitor data:', error);
+                container.innerHTML = '<div class="error">Error loading Live Monitor data. Please try again.</div>';
+            }
+        }
+
+        // Display Live Monitor UI
+        function displayLiveMonitor(data) {
+            const container = document.getElementById('stocksContainer');
+            const tickers = data.tickers;
+
+            // Remember current tab or default to first
+            if (!currentTab || !tickers.includes(currentTab)) {
+                currentTab = tickers[0];
+            }
+
+            // Create Daily Signals Banner
+            let signalCardsHTML = '';
+            for (const ticker of tickers) {
+                const signal = data.daily_signals[ticker];
+                const diff = signal.indicator_diff || 0;
+                let signalType = 'hold';
+                let signalAction = 'HOLD';
+
+                if (diff > 1) {
+                    signalType = 'buy';
+                    signalAction = 'BUY';
+                } else if (diff < -1) {
+                    signalType = 'sell';
+                    signalAction = 'SELL';
+                }
+
+                const hasError = signal.error;
+
+                signalCardsHTML += `
+                    <div class="signal-card ${signalType}" onclick="switchTab('${ticker}')">
+                        <div class="signal-ticker">${ticker.replace('.JK', '')}</div>
+                        ${hasError ?
+                            `<div class="signal-error">${signal.error}</div>` :
+                            `<div class="signal-action">${signalAction}</div>
+                            <div class="signal-diff">${diff > 0 ? '+' : ''}${diff}</div>
+                            <div class="signal-price">Price: ${signal.price ? signal.price.toFixed(0) : 'N/A'}</div>
+                            <div class="signal-date">${signal.date || 'N/A'}</div>`
+                        }
+                    </div>
+                `;
+            }
+
+            const dailySignalsBanner = `
+                <div class="daily-signals-banner">
+                    <div class="daily-signals-title">
+                        Daily Signals <span class="badge">1D</span>
+                        <span style="color: #aaa; font-size: 0.8em; margin-left: auto;">Click card to view 5M data</span>
+                    </div>
+                    <div class="signal-cards">
+                        ${signalCardsHTML}
+                    </div>
+                </div>
+            `;
+
+            // Create Live Data Section with tabs
+            let tabButtonsHTML = '<div class="tab-buttons">';
+            for (const ticker of tickers) {
+                const isActive = ticker === currentTab ? 'active' : '';
+                tabButtonsHTML += `
+                    <div class="tab-btn-wrapper">
+                        <button class="tab-btn ${isActive}" onclick="switchTab('${ticker}')">
+                            ${ticker.replace('.JK', '')}
+                        </button>
+                    </div>`;
+            }
+            tabButtonsHTML += '</div>';
+
+            // Create tab contents for 5M data
+            let tabContentsHTML = '';
+            for (const ticker of tickers) {
+                const isActive = ticker === currentTab ? 'active' : '';
+                const liveInfo = data.live_data[ticker];
+
+                if (liveInfo.data && liveInfo.data.length > 0) {
+                    tabContentsHTML += createTabContent(ticker, liveInfo, isActive);
+                } else {
+                    tabContentsHTML += `
+                        <div id="tab-${ticker}" class="tab-content ${isActive}">
+                            <div class="no-data">No 5M data available for ${ticker}. ${liveInfo.error || ''}</div>
+                        </div>
+                    `;
+                }
+            }
+
+            const liveDataSection = `
+                <div class="live-data-section">
+                    <div class="live-data-header">
+                        <div class="live-data-title">
+                            Live Data <span class="live-badge">5M</span>
+                        </div>
+                    </div>
+                    ${tabButtonsHTML}
+                    ${tabContentsHTML}
+                </div>
+            `;
+
+            container.innerHTML = dailySignalsBanner + liveDataSection;
+        }
 
         // Change timeframe interval
         async function changeInterval(interval) {
@@ -959,8 +1293,12 @@
             button.textContent = 'Refreshing...';
 
             try {
-                await fetch('/api/refresh');
-                await loadStockData();
+                if (currentMode === 'live') {
+                    await loadLiveMonitorData();
+                } else {
+                    await fetch('/api/refresh');
+                    await loadStockData();
+                }
                 button.textContent = 'Refreshed!';
                 setTimeout(() => {
                     button.textContent = 'Refresh';
@@ -979,7 +1317,11 @@
         // Auto-refresh every minute
         function startAutoRefresh() {
             autoRefreshInterval = setInterval(() => {
-                loadStockData();
+                if (currentMode === 'live') {
+                    loadLiveMonitorData();
+                } else {
+                    loadStockData();
+                }
             }, 60000);
         }
 
