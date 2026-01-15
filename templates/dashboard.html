@@ -13,7 +13,7 @@
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+            background: linear-gradient(135deg, #1a2f4a 0%, #2d5a87 50%, #1e4163 100%);
             padding: 20px;
             min-height: 100vh;
         }
@@ -1001,6 +1001,9 @@
             `;
 
             container.innerHTML = dailySignalsBanner + liveDataSection;
+
+            // Auto-scroll tables to show latest data
+            scrollTablesToBottom();
         }
 
         // Change timeframe interval
@@ -1107,6 +1110,18 @@
             }
 
             container.innerHTML = tabButtonsHTML + tabContentsHTML;
+
+            // Auto-scroll all table wrappers to show latest data (bottom)
+            scrollTablesToBottom();
+        }
+
+        // Scroll all table wrappers to bottom to show latest data
+        function scrollTablesToBottom() {
+            setTimeout(() => {
+                document.querySelectorAll('.table-wrapper').forEach(wrapper => {
+                    wrapper.scrollTop = wrapper.scrollHeight;
+                });
+            }, 100); // Small delay to ensure DOM is rendered
         }
 
         // Switch between tabs
@@ -1134,6 +1149,9 @@
             if (tickerHeading) {
                 tickerHeading.textContent = ticker;
             }
+
+            // Scroll the active tab's table to bottom
+            scrollTablesToBottom();
         }
 
         // Create tab content for a stock
