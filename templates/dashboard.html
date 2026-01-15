@@ -518,6 +518,19 @@
             border-radius: 25px;
         }
 
+        .add-stock-label {
+            font-weight: bold;
+            color: #555;
+            font-size: 0.9em;
+            white-space: nowrap;
+        }
+
+        .toolbar-hint {
+            color: #888;
+            font-size: 0.8em;
+            font-style: italic;
+        }
+
         .add-stock-input {
             border: 2px solid #ddd;
             border-radius: 20px;
@@ -808,11 +821,12 @@
         <div class="toolbar">
             <div class="toolbar-left">
                 <div class="add-stock-container">
+                    <label class="add-stock-label">Add Ticker:</label>
                     <input type="text" class="add-stock-input" id="addStockInput"
-                           placeholder="e.g., BBCA.JK, BTC-USD, AAPL"
                            onkeypress="if(event.key==='Enter') addStock()">
                     <button class="add-stock-btn" onclick="addStock()">Add</button>
                 </div>
+                <span class="toolbar-hint">e.g., BBCA.JK, BTC-USD, AAPL</span>
             </div>
             <div class="toolbar-right">
                 <div class="interval-selector" id="intervalSelector">
