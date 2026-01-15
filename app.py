@@ -15,7 +15,7 @@ ACCESS_CODE = os.environ.get('ACCESS_CODE', 'saham123')
 # Global storage for stock data
 stock_data_cache = {}
 last_update_time = None
-current_interval = '1d'  # Default interval
+current_interval = '1h'  # Default interval (1h works better on Railway)
 
 # Indonesian timezone (WIB = UTC+7)
 WIB = pytz.timezone('Asia/Jakarta')
