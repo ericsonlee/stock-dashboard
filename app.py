@@ -52,12 +52,8 @@ DEFAULT_BARS = 50  # Number of bars to show
 # Available intervals
 INTERVALS = {
     '5m': '5 Minutes',
-    '15m': '15 Minutes',
-    '30m': '30 Minutes',
     '1h': '1 Hour',
-    '4h': '4 Hours',
-    '1d': '1 Day',
-    '1wk': '1 Week'
+    '1d': '1 Day'
 }
 
 # Initialize stock fetcher
