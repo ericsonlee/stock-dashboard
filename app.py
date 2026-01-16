@@ -3,6 +3,7 @@ import threading
 import time
 import os
 from datetime import datetime
+import pandas as pd
 import pytz
 from stock_fetcher import StockDataFetcher
 
@@ -44,8 +45,53 @@ def is_trading_hours():
     # Check if within 9:00-16:00 WIB
     return 9 <= hour < 16
 
-# Configuration
-TICKERS = ["RATU.JK", "IMPC.JK", "BKSL.JK"]
+# Dashboard tickers (for 1h/5m detailed view)
+DASHBOARD_TICKERS = ["RATU.JK", "IMPC.JK", "BKSL.JK"]
+
+# Live Monitor watchlist - Top 100 IDX stocks (1D data only, fetched once daily)
+WATCHLIST_TICKERS = [
+    # Original watchlist
+    "RATU.JK", "IMPC.JK", "BKSL.JK",
+    # Big Banks (Big 4)
+    "BBCA.JK", "BBRI.JK", "BMRI.JK", "BBNI.JK",
+    # Other Banks
+    "BRIS.JK", "BTPS.JK", "BBTN.JK", "BDMN.JK", "MEGA.JK", "NISP.JK", "BNGA.JK", "PNBN.JK", "BNLI.JK",
+    # Telco & Tech
+    "TLKM.JK", "EXCL.JK", "ISAT.JK", "TOWR.JK", "TBIG.JK", "GOTO.JK", "BUKA.JK", "EMTK.JK",
+    # Consumer Goods
+    "UNVR.JK", "ICBP.JK", "INDF.JK", "MYOR.JK", "KLBF.JK", "SIDO.JK", "ULTJ.JK", "CPIN.JK", "JPFA.JK",
+    # Automotive & Manufacturing
+    "ASII.JK", "AUTO.JK", "SMSM.JK", "IMAS.JK", "GJTL.JK",
+    # Mining & Resources
+    "ADRO.JK", "PTBA.JK", "ITMG.JK", "INDY.JK", "BYAN.JK", "HRUM.JK", "MBAP.JK", "GEMS.JK",
+    "ANTM.JK", "INCO.JK", "TINS.JK", "MDKA.JK", "BRMS.JK",
+    # Oil & Gas
+    "PGAS.JK", "MEDC.JK", "AKRA.JK", "ELSA.JK",
+    # Property & Construction
+    "BSDE.JK", "CTRA.JK", "SMRA.JK", "PWON.JK", "LPKR.JK", "DMAS.JK", "DILD.JK", "APLN.JK",
+    "WIKA.JK", "WSKT.JK", "PTPP.JK", "ADHI.JK", "JSMR.JK",
+    # Cement & Building Materials
+    "SMGR.JK", "INTP.JK", "WTON.JK",
+    # Retail & Trade
+    "ACES.JK", "MAPI.JK", "LPPF.JK", "RALS.JK", "ERAA.JK", "MTRA.JK",
+    # Healthcare & Pharma
+    "HEAL.JK", "MIKA.JK", "SILO.JK", "PRDA.JK", "DVLA.JK", "PYFA.JK",
+    # Plantation & Agriculture
+    "AALI.JK", "LSIP.JK", "DSNG.JK", "SIMP.JK", "SGRO.JK",
+    # Industrial & Chemicals
+    "BRPT.JK", "TPIA.JK", "INKP.JK", "TKIM.JK", "FASW.JK",
+    # Finance (Non-Bank)
+    "ADMF.JK", "BFIN.JK", "MFIN.JK", "CFIN.JK", "WOMF.JK",
+    # Media & Entertainment
+    "SCMA.JK", "MNCN.JK", "VIVA.JK",
+    # Transportation & Logistics
+    "BIRD.JK", "ASSA.JK", "SMDR.JK", "TMAS.JK",
+    # Others / Diversified
+    "UNTR.JK", "ESSA.JK", "SRTG.JK", "ARTO.JK", "AMMN.JK", "CUAN.JK", "FILM.JK", "PGEO.JK"
+]
+
+# For backward compatibility
+TICKERS = DASHBOARD_TICKERS
 UPDATE_INTERVAL = 300  # Update every 5 minutes
 DEFAULT_BARS = 50  # Number of bars to show
 
@@ -269,77 +315,59 @@ def remove_stock(ticker):
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
-@app.route('/api/live_monitor')
-def get_live_monitor_data():
-    """API endpoint for Live Monitor - returns 1D signals + 5M live data (cached for 2 min)"""
+@app.route('/api/watchlist')
+def get_watchlist_data():
+    """API endpoint for 1D watchlist data for all 100 stocks (cached for 1 hour during market, 24h outside)"""
     if not check_auth():
         return jsonify({'error': 'Unauthorized'}), 401
 
     global live_monitor_cache
 
     # Check if cache is still valid
+    # During trading hours: cache for 1 hour (1D data doesn't change intraday much)
+    # Outside trading hours: cache for 24 hours (data won't change until next trading day)
     now = datetime.now(WIB)
     if (live_monitor_cache['data'] is not None and
         live_monitor_cache['last_update'] is not None):
         cache_age = (now - live_monitor_cache['last_update']).total_seconds()
-        if cache_age < live_monitor_cache['cache_duration']:
-            print(f"[{get_wib_time()}] Returning cached Live Monitor data (age: {cache_age:.0f}s)")
+        cache_duration = 3600 if is_trading_hours() else 86400  # 1 hour or 24 hours
+        if cache_age < cache_duration:
+            print(f"[{get_wib_time()}] Returning cached watchlist data (age: {cache_age:.0f}s)")
             return jsonify(live_monitor_cache['data'])
 
-    print(f"[{get_wib_time()}] Fetching fresh Live Monitor data...")
+    print(f"[{get_wib_time()}] Fetching fresh watchlist data for {len(WATCHLIST_TICKERS)} stocks...")
 
     daily_signals = {}
-    live_data = {}
 
-    for ticker in TICKERS:
+    for ticker in WATCHLIST_TICKERS:
         try:
-            # Fetch 1D data for signals (just need latest row)
-            daily_df = fetcher.get_stock_data(ticker, bars=5, interval='1d')
+            # Fetch minimal 1D data - only need 15 bars for indicator calculation (MA10 needs 10, plus buffer)
+            daily_df = fetcher.get_stock_data(ticker, bars=15, interval='1d')
             if daily_df is not None and not daily_df.empty:
-                latest_daily = daily_df.iloc[-1].to_dict()
+                # Only send the latest row for the watchlist table
+                latest_row = daily_df.iloc[-1].to_dict()
                 daily_signals[ticker] = {
-                    'indicator': latest_daily.get('Indicator', 0),
-                    'indicator_diff': latest_daily.get('Indicator_Diff', 0),
-                    'price': latest_daily.get('Price', 0),
-                    'date': latest_daily.get('Date', 'N/A')
-                }
-            else:
-                daily_signals[ticker] = {
-                    'indicator': 0,
-                    'indicator_diff': 0,
-                    'price': 0,
-                    'date': 'N/A',
-                    'error': 'No daily data'
-                }
-
-            # Fetch 5M data for live monitoring
-            live_df = fetcher.get_stock_data(ticker, bars=30, interval='5m')
-            if live_df is not None and not live_df.empty:
-                live_data[ticker] = {
-                    'data': live_df.to_dict('records'),
+                    'data': [latest_row],
                     'ticker': ticker,
-                    'interval': '5m',
+                    'interval': '1d',
                     'last_update': get_wib_time()
                 }
             else:
-                live_data[ticker] = {
+                daily_signals[ticker] = {
                     'data': [],
                     'ticker': ticker,
-                    'interval': '5m',
-                    'last_update': get_wib_time(),
-                    'error': 'No 5M data'
+                    'interval': '1d',
+                    'error': 'No daily data'
                 }
 
-            print(f"  ✓ Live Monitor: {ticker}")
+            print(f"  ✓ Watchlist: {ticker}")
         except Exception as e:
-            print(f"  ✗ Live Monitor error {ticker}: {e}")
-            daily_signals[ticker] = {'indicator': 0, 'indicator_diff': 0, 'price': 0, 'date': 'N/A', 'error': str(e)}
-            live_data[ticker] = {'data': [], 'ticker': ticker, 'interval': '5m', 'error': str(e)}
+            print(f"  ✗ Watchlist error {ticker}: {e}")
+            daily_signals[ticker] = {'data': [], 'ticker': ticker, 'interval': '1d', 'error': str(e)}
 
     response_data = {
         'daily_signals': daily_signals,
-        'live_data': live_data,
-        'tickers': TICKERS,
+        'tickers': WATCHLIST_TICKERS,
         'last_update': get_wib_time()
     }
 
@@ -349,12 +377,308 @@ def get_live_monitor_data():
 
     return jsonify(response_data)
 
+@app.route('/api/watchlist/refresh')
+def refresh_watchlist():
+    """Force refresh watchlist cache and re-fetch all 1D data"""
+    if not check_auth():
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    global live_monitor_cache
+
+    # Clear the cache
+    live_monitor_cache['data'] = None
+    live_monitor_cache['last_update'] = None
+
+    print(f"[{get_wib_time()}] Force refreshing watchlist cache...")
+
+    # Re-fetch using batch download
+    fetch_watchlist_data()
+
+    return jsonify({
+        'success': True,
+        'message': f'Refreshed {len(WATCHLIST_TICKERS)} stocks',
+        'last_update': get_wib_time()
+    })
+
+@app.route('/api/watchlist/add/<ticker>')
+def add_to_watchlist(ticker):
+    """Add a ticker to the watchlist and fetch its 1D data"""
+    if not check_auth():
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    global live_monitor_cache
+    import pandas_ta as ta
+
+    # Normalize ticker (uppercase, add .JK if needed for Indonesian stocks)
+    ticker = ticker.upper()
+    if not ticker.endswith('.JK') and '.' not in ticker and '-' not in ticker:
+        ticker = ticker + '.JK'
+
+    # Check if already exists
+    if ticker in WATCHLIST_TICKERS:
+        return jsonify({'success': False, 'error': f'{ticker} already in watchlist'}), 400
+
+    try:
+        print(f"[{get_wib_time()}] Adding {ticker} to watchlist...")
+
+        # Fetch 1D data for the new ticker
+        daily_df = fetcher.get_stock_data(ticker, bars=15, interval='1d')
+
+        if daily_df is None or daily_df.empty:
+            return jsonify({'success': False, 'error': f'No data found for {ticker}. Check if the ticker is valid.'}), 404
+
+        # Get latest row and convert NaN to None
+        latest_row = daily_df.iloc[-1].to_dict()
+        for key, value in latest_row.items():
+            if pd.isna(value):
+                latest_row[key] = None
+
+        # Add to WATCHLIST_TICKERS
+        WATCHLIST_TICKERS.append(ticker)
+
+        # Add to cache
+        if live_monitor_cache['data'] is not None:
+            live_monitor_cache['data']['daily_signals'][ticker] = {
+                'data': [latest_row],
+                'ticker': ticker,
+                'interval': '1d',
+                'last_update': get_wib_time()
+            }
+            live_monitor_cache['data']['tickers'] = WATCHLIST_TICKERS
+
+        print(f"  ✓ Added {ticker} to watchlist")
+        return jsonify({
+            'success': True,
+            'ticker': ticker,
+            'data': latest_row,
+            'tickers': WATCHLIST_TICKERS
+        })
+
+    except Exception as e:
+        print(f"  ✗ Error adding {ticker} to watchlist: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# Cache for individual ticker 5M data
+live_data_cache = {}
+
+@app.route('/api/live_data/<ticker>')
+def get_live_data(ticker):
+    """API endpoint for 5M live data for a single ticker (on-demand, cached for 2 min)"""
+    if not check_auth():
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    global live_data_cache
+
+    # Normalize ticker
+    ticker = ticker.upper()
+    if not ticker.endswith('.JK') and '.' not in ticker and '-' not in ticker:
+        ticker = ticker + '.JK'
+
+    # Check if cache is valid for this ticker
+    now = datetime.now(WIB)
+    if ticker in live_data_cache:
+        cache_entry = live_data_cache[ticker]
+        if cache_entry.get('last_update_dt'):
+            cache_age = (now - cache_entry['last_update_dt']).total_seconds()
+            if cache_age < 120:  # 2 minute cache
+                print(f"[{get_wib_time()}] Returning cached 5M data for {ticker} (age: {cache_age:.0f}s)")
+                return jsonify(cache_entry['data'])
+
+    print(f"[{get_wib_time()}] Fetching fresh 5M data for {ticker}...")
+
+    try:
+        live_df = fetcher.get_stock_data(ticker, bars=30, interval='5m')
+        if live_df is not None and not live_df.empty:
+            response_data = {
+                'data': live_df.to_dict('records'),
+                'ticker': ticker,
+                'interval': '5m',
+                'last_update': get_wib_time()
+            }
+            # Update cache
+            live_data_cache[ticker] = {
+                'data': response_data,
+                'last_update_dt': now
+            }
+            print(f"  ✓ 5M data: {ticker}")
+            return jsonify(response_data)
+        else:
+            return jsonify({
+                'data': [],
+                'ticker': ticker,
+                'interval': '5m',
+                'error': 'No 5M data available'
+            })
+    except Exception as e:
+        print(f"  ✗ 5M data error {ticker}: {e}")
+        return jsonify({
+            'data': [],
+            'ticker': ticker,
+            'interval': '5m',
+            'error': str(e)
+        }), 500
+
+def fetch_watchlist_data():
+    """Fetch 1D data for all watchlist stocks using yfinance batch download"""
+    global live_monitor_cache
+    import yfinance as yf
+    import pandas_ta as ta
+
+    print(f"[{get_wib_time()}] Pre-fetching 1D data for {len(WATCHLIST_TICKERS)} watchlist stocks (batch)...")
+
+    daily_signals = {}
+    success_count = 0
+
+    try:
+        # Use yfinance batch download - much faster than individual requests
+        # Download 30 days of data (need ~15 for indicators)
+        tickers_str = " ".join(WATCHLIST_TICKERS)
+        print(f"  Downloading batch data...")
+        data = yf.download(tickers_str, period='1mo', interval='1d', progress=False, group_by='ticker', threads=True)
+
+        print(f"  Processing {len(WATCHLIST_TICKERS)} tickers...")
+
+        for ticker in WATCHLIST_TICKERS:
+            try:
+                # Extract data for this ticker
+                if len(WATCHLIST_TICKERS) == 1:
+                    df = data.copy()
+                else:
+                    if ticker not in data.columns.get_level_values(0):
+                        daily_signals[ticker] = {'data': [], 'ticker': ticker, 'interval': '1d', 'error': 'No data in batch'}
+                        print(f"  ✗ {ticker} (not in batch)")
+                        continue
+                    df = data[ticker].copy()
+
+                if df.empty or df['Close'].isna().all():
+                    daily_signals[ticker] = {'data': [], 'ticker': ticker, 'interval': '1d', 'error': 'Empty data'}
+                    print(f"  ✗ {ticker} (empty)")
+                    continue
+
+                # Drop rows with NaN close prices
+                df = df.dropna(subset=['Close'])
+
+                if len(df) < 10:
+                    daily_signals[ticker] = {'data': [], 'ticker': ticker, 'interval': '1d', 'error': 'Not enough data'}
+                    print(f"  ✗ {ticker} (not enough bars)")
+                    continue
+
+                # Calculate indicators (same as StockDataFetcher)
+                df['Price'] = df['Close']
+                df['MA_5'] = ta.sma(df['Close'], length=5)
+                df['MA_10'] = ta.sma(df['Close'], length=10)
+                df['RSI_Score'] = ta.rsi(df['Close'], length=14)
+
+                # SuperTrend
+                st_data = ta.supertrend(df['High'], df['Low'], df['Close'], length=10, multiplier=3)
+                if st_data is not None and not st_data.empty:
+                    df['SuperTrend'] = st_data.iloc[:, 0].apply(lambda x: f"{x:.0f}" if pd.notna(x) else "N/A")
+                    df['SuperTrend_Color'] = st_data.iloc[:, 1].apply(lambda x: 'GREEN' if x == 1 else 'RED' if x == -1 else 'NEUTRAL')
+                else:
+                    df['SuperTrend'] = "N/A"
+                    df['SuperTrend_Color'] = "NEUTRAL"
+
+                # Volume Oscillator
+                vol_short = ta.sma(df['Volume'], length=5)
+                vol_long = ta.sma(df['Volume'], length=10)
+                df['Vol_Osc'] = ((vol_short - vol_long) / vol_long) * 100
+
+                # Scores
+                df['Score_MA5'] = df.apply(lambda r: 1 if r['Price'] > r['MA_5'] else (-1 if r['Price'] < r['MA_5'] else 0) if pd.notna(r['MA_5']) else 0, axis=1)
+                df['Score_MA10'] = df.apply(lambda r: 1 if r['Price'] > r['MA_10'] else (-1 if r['Price'] < r['MA_10'] else 0) if pd.notna(r['MA_10']) else 0, axis=1)
+
+                def score_rsi(rsi):
+                    if pd.isna(rsi): return 0
+                    if rsi > 75 or rsi <= 30: return -1
+                    if 50 <= rsi <= 75: return 1
+                    return 0
+                df['Score_RSI'] = df['RSI_Score'].apply(score_rsi)
+                df['Score_SuperTrend'] = df['SuperTrend_Color'].apply(lambda x: 1 if x == 'GREEN' else (-1 if x == 'RED' else 0))
+
+                def score_vol_osc(row):
+                    if pd.isna(row['Vol_Osc']) or pd.isna(row['MA_5']) or pd.isna(row['MA_10']): return 0
+                    price_above = row['Price'] > row['MA_5'] and row['Price'] > row['MA_10']
+                    price_below = row['Price'] < row['MA_5'] and row['Price'] < row['MA_10']
+                    vol = row['Vol_Osc']
+                    if vol > 0: return 1
+                    return -1
+                df['Score_VolOsc'] = df.apply(score_vol_osc, axis=1)
+
+                def vol_osc_result(row):
+                    if pd.isna(row['Vol_Osc']) or pd.isna(row['MA_5']) or pd.isna(row['MA_10']): return "N/A"
+                    price_above = row['Price'] > row['MA_5'] and row['Price'] > row['MA_10']
+                    price_below = row['Price'] < row['MA_5'] and row['Price'] < row['MA_10']
+                    vol = row['Vol_Osc']
+                    if price_above and vol >= 20: return "STRONG"
+                    if price_above and vol <= -15: return "BEARISH INDICATOR"
+                    if price_below and vol >= 20: return "ACCUM"
+                    if price_below and vol <= -15: return "CONFIRM BEARISH"
+                    if vol > 0: return "UP"
+                    return "DOWN"
+                df['Vol_Osc_Result'] = df.apply(vol_osc_result, axis=1)
+
+                # Total Indicator
+                df['Indicator'] = df['Score_MA5'] + df['Score_MA10'] + df['Score_RSI'] + df['Score_SuperTrend'] + df['Score_VolOsc']
+                df['Indicator_Diff'] = df['Indicator'].diff().fillna(0).astype(int)
+
+                # Format date
+                df['Date'] = df.index.strftime('%Y-%m-%d')
+
+                # Round numeric columns
+                for col in ['Price', 'MA_5', 'MA_10', 'RSI_Score', 'Vol_Osc']:
+                    if col in df.columns:
+                        df[col] = df[col].round(2)
+
+                # Get latest row and convert NaN to None for valid JSON
+                latest_row = df.iloc[-1].to_dict()
+                # Replace NaN values with None (becomes null in JSON)
+                for key, value in latest_row.items():
+                    if pd.isna(value):
+                        latest_row[key] = None
+
+                daily_signals[ticker] = {
+                    'data': [latest_row],
+                    'ticker': ticker,
+                    'interval': '1d',
+                    'last_update': get_wib_time()
+                }
+                success_count += 1
+                print(f"  ✓ {ticker}")
+
+            except Exception as e:
+                daily_signals[ticker] = {'data': [], 'ticker': ticker, 'interval': '1d', 'error': str(e)}
+                print(f"  ✗ {ticker}: {e}")
+
+    except Exception as e:
+        print(f"  Batch download failed: {e}")
+        # Fallback: mark all as failed
+        for ticker in WATCHLIST_TICKERS:
+            if ticker not in daily_signals:
+                daily_signals[ticker] = {'data': [], 'ticker': ticker, 'interval': '1d', 'error': 'Batch failed'}
+
+    response_data = {
+        'daily_signals': daily_signals,
+        'tickers': WATCHLIST_TICKERS,
+        'last_update': get_wib_time()
+    }
+
+    # Update cache
+    live_monitor_cache['data'] = response_data
+    live_monitor_cache['last_update'] = datetime.now(WIB)
+
+    print(f"[{get_wib_time()}] Watchlist pre-fetch complete ({success_count}/{len(WATCHLIST_TICKERS)} stocks)")
+
 # Initialize on startup (works with both direct run and gunicorn)
 def init_app():
     print("Performing initial data fetch...")
+
+    # 1. Fetch dashboard stocks (3 tickers, 1h data)
     fetch_all_stocks(interval=current_interval, bars=DEFAULT_BARS)
 
-    # Start background update thread
+    # 2. Pre-fetch watchlist stocks (100 tickers, 1D data) - runs once at startup
+    fetch_watchlist_data()
+
+    # Start background update thread (only updates dashboard stocks)
     update_thread = threading.Thread(target=update_stock_data, daemon=True)
     update_thread.start()
     print(f"Background updater started (interval: {UPDATE_INTERVAL}s)")

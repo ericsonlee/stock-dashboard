@@ -667,6 +667,92 @@
             font-size: 0.8em;
         }
 
+        /* 1D section tabs and content styling */
+        .daily-signals-banner .tab-buttons {
+            background: rgba(255,255,255,0.05);
+            border-radius: 10px 10px 0 0;
+            margin-bottom: 0;
+        }
+
+        .daily-signals-banner .tab-btn {
+            background: transparent;
+            color: #aaa;
+        }
+
+        .daily-signals-banner .tab-btn:hover {
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+        }
+
+        .daily-signals-banner .tab-btn.active {
+            background: rgba(102, 126, 234, 0.3);
+            color: #fff;
+        }
+
+        .daily-signals-banner .tab-content {
+            background: rgba(255,255,255,0.05);
+            border-radius: 0 0 10px 10px;
+            padding: 15px;
+        }
+
+        .daily-signals-banner .summary-stats {
+            background: transparent;
+            box-shadow: none;
+        }
+
+        .daily-signals-banner .stat-box {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .daily-signals-banner .stat-label {
+            color: #aaa;
+        }
+
+        .daily-signals-banner .stat-value {
+            color: #fff;
+        }
+
+        .daily-signals-banner .table-wrapper {
+            background: rgba(0,0,0,0.2);
+            border-radius: 10px;
+        }
+
+        .daily-signals-banner table {
+            background: transparent;
+        }
+
+        .daily-signals-banner th {
+            background: rgba(102, 126, 234, 0.3);
+            color: #fff;
+        }
+
+        .daily-signals-banner td {
+            background: rgba(255,255,255,0.85);
+            color: #000;
+            border-bottom: 1px solid rgba(0,0,0,0.1);
+        }
+
+        .daily-signals-banner tr:hover td {
+            background: rgba(255,255,255,0.95);
+            cursor: pointer;
+        }
+
+        .daily-signals-banner tr.selected td:first-child {
+            background: rgba(102, 126, 234, 0.5);
+            color: #fff;
+        }
+
+        /* Make text black on colored cells in dark theme */
+        .daily-signals-banner .green-bg,
+        .daily-signals-banner .red-bg,
+        .daily-signals-banner .yellow-bg,
+        .daily-signals-banner td.green-bg,
+        .daily-signals-banner td.red-bg,
+        .daily-signals-banner td.yellow-bg {
+            color: #000 !important;
+        }
+
         .signal-cards {
             display: flex;
             gap: 15px;
@@ -878,30 +964,163 @@
             }
         }
 
-        // Load Live Monitor data (1D signals + 5M live)
+        // Store watchlist data globally for sorting
+        let watchlistData = null;
+
+        // Load Live Monitor data (1D watchlist first, then 5M on-demand)
         async function loadLiveMonitorData() {
             const container = document.getElementById('stocksContainer');
             container.innerHTML = `
                 <div class="loading">
                     <div class="spinner"></div>
-                    <p>Loading Live Monitor data (1D signals + 5M live)...</p>
+                    <p>Loading watchlist data...</p>
+                </div>
+            `;
+
+            // Reset currentTab so it defaults to top sorted ticker (highest Diff)
+            currentTab = null;
+
+            try {
+                // First load 1D watchlist data
+                const response = await fetch('/api/watchlist');
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                console.log('Watchlist API response:', data);
+                console.log('Tickers:', data.tickers);
+                console.log('Daily signals keys:', data.daily_signals ? Object.keys(data.daily_signals).length : 'none');
+
+                if (data.daily_signals && Object.keys(data.daily_signals).length > 0) {
+                    watchlistData = data;
+                    try {
+                        displayLiveMonitor(data);
+                    } catch (displayError) {
+                        console.error('Error in displayLiveMonitor:', displayError);
+                        container.innerHTML = `<div class="error">Error displaying data: ${displayError.message}</div>`;
+                        return;
+                    }
+                    updateLastUpdateTime(data.last_update);
+                    // Load 5M data for the selected ticker
+                    await loadLiveDataForTicker(currentTab);
+                } else {
+                    console.error('No daily_signals in response:', data);
+                    container.innerHTML = '<div class="error">Error loading watchlist data. No signals found.</div>';
+                }
+            } catch (error) {
+                console.error('Error loading watchlist data:', error);
+                console.error('Error stack:', error.stack);
+                container.innerHTML = `<div class="error">Error loading watchlist data: ${error.message}</div>`;
+            }
+        }
+
+        // Load 5M data for a specific ticker (on-demand)
+        async function loadLiveDataForTicker(ticker) {
+            const liveContainer = document.getElementById(`live-tab-${ticker}`);
+            if (!liveContainer) return;
+
+            // Show loading in the 5M section
+            liveContainer.innerHTML = `
+                <div class="loading" style="padding: 40px;">
+                    <div class="spinner"></div>
+                    <p>Loading 5M data for ${ticker.replace('.JK', '')}...</p>
                 </div>
             `;
 
             try {
-                const response = await fetch('/api/live_monitor');
+                const response = await fetch(`/api/live_data/${ticker}`);
                 const data = await response.json();
 
-                if (data.daily_signals && data.live_data) {
-                    displayLiveMonitor(data);
-                    updateLastUpdateTime(data.last_update);
+                if (data.data && data.data.length > 0) {
+                    liveContainer.innerHTML = createLiveDataContent(data);
+                    scrollTablesToBottom();
                 } else {
-                    container.innerHTML = '<div class="error">Error loading Live Monitor data.</div>';
+                    liveContainer.innerHTML = `<div class="no-data" style="padding: 40px;">No 5M data available for ${ticker}. ${data.error || ''}</div>`;
                 }
             } catch (error) {
-                console.error('Error loading live monitor data:', error);
-                container.innerHTML = '<div class="error">Error loading Live Monitor data. Please try again.</div>';
+                console.error(`Error loading 5M data for ${ticker}:`, error);
+                liveContainer.innerHTML = `<div class="error" style="padding: 40px;">Error loading 5M data. Please try again.</div>`;
             }
+        }
+
+        // Create 5M data content HTML
+        function createLiveDataContent(stockInfo) {
+            const latestData = stockInfo.data[stockInfo.data.length - 1];
+
+            const summaryHTML = `
+                <div class="summary-stats">
+                    <div class="stat-box">
+                        <div class="stat-label">Price</div>
+                        <div class="stat-value">${safeFixed(latestData.Price)}</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">MA 5</div>
+                        <div class="stat-value" style="color: ${latestData.Score_MA5 > 0 ? '#4CAF50' : latestData.Score_MA5 < 0 ? '#f44336' : '#FFC107'}">${safeFixed(latestData.MA_5)}</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">MA 10</div>
+                        <div class="stat-value" style="color: ${latestData.Score_MA10 > 0 ? '#4CAF50' : latestData.Score_MA10 < 0 ? '#f44336' : '#FFC107'}">${safeFixed(latestData.MA_10)}</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">RSI</div>
+                        <div class="stat-value" style="color: ${latestData.Score_RSI > 0 ? '#4CAF50' : latestData.Score_RSI < 0 ? '#f44336' : '#FFC107'}">${safeFixed(latestData.RSI_Score)}</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">SuperTrend</div>
+                        <div class="stat-value" style="color: ${latestData.SuperTrend_Color === 'GREEN' ? '#4CAF50' : '#f44336'}">${latestData.SuperTrend_Color || 'N/A'}</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">Indicator</div>
+                        <div class="stat-value" style="color: ${latestData.Indicator > 0 ? '#4CAF50' : latestData.Indicator < 0 ? '#f44336' : '#FFC107'}; font-size: 1.5em;">${latestData.Indicator ?? 'N/A'}</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">Diff</div>
+                        <div class="stat-value" style="color: ${latestData.Indicator_Diff > 0 ? '#4CAF50' : latestData.Indicator_Diff < 0 ? '#f44336' : '#FFC107'}; font-size: 1.5em;">${latestData.Indicator_Diff > 0 ? '+' : ''}${latestData.Indicator_Diff ?? 'N/A'}</div>
+                    </div>
+                </div>
+            `;
+
+            const tableHTML = `
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date/Time</th>
+                                <th>Price</th>
+                                <th>MA 5</th>
+                                <th>MA 10</th>
+                                <th>RSI</th>
+                                <th>SuperTrend</th>
+                                <th>Vol Osc %</th>
+                                <th>Vol Osc Result</th>
+                                <th>Indicator</th>
+                                <th>Diff</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${stockInfo.data.map(row => `
+                                <tr>
+                                    <td>${row.Date || 'N/A'}</td>
+                                    <td>${safeFixed(row.Price)}</td>
+                                    <td class="${getScoreClass(row.Score_MA5)}">${safeFixed(row.MA_5)}</td>
+                                    <td class="${getScoreClass(row.Score_MA10)}">${safeFixed(row.MA_10)}</td>
+                                    <td class="${getRsiClass(row.RSI_Score, row.Score_RSI)}">${safeFixed(row.RSI_Score)}</td>
+                                    <td class="${row.SuperTrend_Color === 'GREEN' ? 'green-bg' : 'red-bg'}">${row.SuperTrend || 'N/A'}</td>
+                                    <td>${safeFixed(row.Vol_Osc)}%</td>
+                                    <td class="${getVolOscClass(row.Vol_Osc_Result)}">${row.Vol_Osc_Result || 'N/A'}</td>
+                                    <td class="${getIndicatorClass(row.Indicator)}">${row.Indicator ?? 'N/A'}</td>
+                                    <td class="${getIndicatorDiffClass(row.Indicator_Diff)}">${row.Indicator_Diff > 0 ? '+' : ''}${row.Indicator_Diff ?? 'N/A'}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+
+            return summaryHTML + tableHTML;
         }
 
         // Display Live Monitor UI
@@ -909,101 +1128,138 @@
             const container = document.getElementById('stocksContainer');
             const tickers = data.tickers;
 
-            // Remember current tab or default to first
+            // Sort tickers by Indicator_Diff (biggest first)
+            const sortedTickers = [...tickers].sort((a, b) => {
+                const aInfo = data.daily_signals[a];
+                const bInfo = data.daily_signals[b];
+                const aDiff = (aInfo.data && aInfo.data.length > 0) ? aInfo.data[aInfo.data.length - 1].Indicator_Diff : 0;
+                const bDiff = (bInfo.data && bInfo.data.length > 0) ? bInfo.data[bInfo.data.length - 1].Indicator_Diff : 0;
+                return bDiff - aDiff; // Descending order (biggest first)
+            });
+
+            // Always default to first sorted ticker (highest Diff) on initial load
+            // Only keep current selection if user explicitly selected a ticker
             if (!currentTab || !tickers.includes(currentTab)) {
-                currentTab = tickers[0];
+                currentTab = sortedTickers[0];
             }
 
-            // Create Daily Signals Banner
-            let signalCardsHTML = '';
-            for (const ticker of tickers) {
-                const signal = data.daily_signals[ticker];
-                const diff = signal.indicator_diff || 0;
-                let signalType = 'hold';
-                let signalAction = 'HOLD';
-
-                if (diff > 1) {
-                    signalType = 'buy';
-                    signalAction = 'BUY';
-                } else if (diff < -1) {
-                    signalType = 'sell';
-                    signalAction = 'SELL';
+            // Create 1D Watchlist Table (sorted by Indicator_Diff, biggest first)
+            // Rows are clickable to select which 5M data to show
+            let dailyTableRows = '';
+            for (const ticker of sortedTickers) {
+                const dailyInfo = data.daily_signals[ticker];
+                const isSelected = ticker === currentTab ? 'selected' : '';
+                if (dailyInfo.data && dailyInfo.data.length > 0) {
+                    const row = dailyInfo.data[dailyInfo.data.length - 1]; // Latest row
+                    dailyTableRows += `
+                        <tr class="${isSelected}" data-ticker="${ticker}" onclick="selectTicker('${ticker}')">
+                            <td><strong>${ticker.replace('.JK', '')}</strong></td>
+                            <td>${safeFixed(row.Price)}</td>
+                            <td class="${getScoreClass(row.Score_MA5)}">${safeFixed(row.MA_5)}</td>
+                            <td class="${getScoreClass(row.Score_MA10)}">${safeFixed(row.MA_10)}</td>
+                            <td class="${getRsiClass(row.RSI_Score, row.Score_RSI)}">${safeFixed(row.RSI_Score)}</td>
+                            <td class="${row.SuperTrend_Color === 'GREEN' ? 'green-bg' : 'red-bg'}">${row.SuperTrend || 'N/A'}</td>
+                            <td>${safeFixed(row.Vol_Osc)}%</td>
+                            <td class="${getVolOscClass(row.Vol_Osc_Result)}">${row.Vol_Osc_Result || 'N/A'}</td>
+                            <td class="${getIndicatorClass(row.Indicator)}">${row.Indicator ?? 'N/A'}</td>
+                            <td class="${getIndicatorDiffClass(row.Indicator_Diff)}">${row.Indicator_Diff > 0 ? '+' : ''}${row.Indicator_Diff ?? 'N/A'}</td>
+                        </tr>
+                    `;
+                } else {
+                    dailyTableRows += `
+                        <tr class="${isSelected}" data-ticker="${ticker}" onclick="selectTicker('${ticker}')">
+                            <td><strong>${ticker.replace('.JK', '')}</strong></td>
+                            <td colspan="9" class="no-data">No data available</td>
+                        </tr>
+                    `;
                 }
-
-                const hasError = signal.error;
-
-                signalCardsHTML += `
-                    <div class="signal-card ${signalType}" onclick="switchTab('${ticker}')">
-                        <div class="signal-ticker">${ticker.replace('.JK', '')}</div>
-                        ${hasError ?
-                            `<div class="signal-error">${signal.error}</div>` :
-                            `<div class="signal-action">${signalAction}</div>
-                            <div class="signal-diff">${diff > 0 ? '+' : ''}${diff}</div>
-                            <div class="signal-price">Price: ${signal.price ? signal.price.toFixed(0) : 'N/A'}</div>
-                            <div class="signal-date">${signal.date || 'N/A'}</div>`
-                        }
-                    </div>
-                `;
             }
 
-            const dailySignalsBanner = `
+            const dailyStatsSection = `
                 <div class="daily-signals-banner">
                     <div class="daily-signals-title">
-                        Daily Signals <span class="badge">1D</span>
-                        <span style="color: #aaa; font-size: 0.8em; margin-left: auto;">Click card to view 5M data</span>
+                        IDX Stocks <span class="badge">Latest 1D Indicator</span> <span class="badge" style="background: #4CAF50;">${sortedTickers.length} stocks</span>
                     </div>
-                    <div class="signal-cards">
-                        ${signalCardsHTML}
+                    <div class="table-wrapper" style="max-height: 400px;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Ticker 🔍</th>
+                                    <th>Price</th>
+                                    <th>MA 5</th>
+                                    <th>MA 10</th>
+                                    <th>RSI</th>
+                                    <th>SuperTrend</th>
+                                    <th>Vol Osc %</th>
+                                    <th>Vol Osc Result</th>
+                                    <th>Indicator</th>
+                                    <th>Diff</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${dailyTableRows}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             `;
 
-            // Create Live Data Section with tabs
-            let tabButtonsHTML = '<div class="tab-buttons">';
+            // Create 5M Live Data Section (placeholder divs - data loaded on-demand)
+            let liveTabContentsHTML = '';
             for (const ticker of tickers) {
                 const isActive = ticker === currentTab ? 'active' : '';
-                tabButtonsHTML += `
-                    <div class="tab-btn-wrapper">
-                        <button class="tab-btn ${isActive}" data-ticker="${ticker}" onclick="switchTab('${ticker}')">
-                            ${ticker.replace('.JK', '')}
-                        </button>
-                    </div>`;
-            }
-            tabButtonsHTML += '</div>';
-
-            // Create tab contents for 5M data
-            let tabContentsHTML = '';
-            for (const ticker of tickers) {
-                const isActive = ticker === currentTab ? 'active' : '';
-                const liveInfo = data.live_data[ticker];
-
-                if (liveInfo.data && liveInfo.data.length > 0) {
-                    tabContentsHTML += createTabContent(ticker, liveInfo, isActive);
-                } else {
-                    tabContentsHTML += `
-                        <div id="tab-${ticker}" class="tab-content ${isActive}">
-                            <div class="no-data">No 5M data available for ${ticker}. ${liveInfo.error || ''}</div>
+                liveTabContentsHTML += `
+                    <div id="live-tab-${ticker}" class="tab-content ${isActive}">
+                        <div class="loading" style="padding: 40px;">
+                            <div class="spinner"></div>
+                            <p>Click a row above to load 5M data...</p>
                         </div>
-                    `;
-                }
+                    </div>
+                `;
             }
 
             const liveDataSection = `
                 <div class="live-data-section">
                     <div class="live-data-header">
                         <div class="live-data-title">
-                            Live Data <span class="live-badge">5M</span>
+                            Live Data <span class="live-badge">5M</span> - <span id="selectedTickerLabel">${currentTab.replace('.JK', '')}</span>
                         </div>
                     </div>
-                    ${tabButtonsHTML}
-                    ${tabContentsHTML}
+                    ${liveTabContentsHTML}
                 </div>
             `;
 
-            container.innerHTML = dailySignalsBanner + liveDataSection;
+            container.innerHTML = dailyStatsSection + liveDataSection;
+        }
 
-            // Auto-scroll tables to show latest data
-            scrollTablesToBottom();
+        // Select ticker from 1D table row click
+        async function selectTicker(ticker) {
+            currentTab = ticker;
+
+            // Update row selection in 1D table
+            document.querySelectorAll('.daily-signals-banner tr[data-ticker]').forEach(row => {
+                row.classList.remove('selected');
+                if (row.dataset.ticker === ticker) {
+                    row.classList.add('selected');
+                }
+            });
+
+            // Update 5M content visibility
+            document.querySelectorAll('[id^="live-tab-"]').forEach(content => {
+                content.classList.remove('active');
+                if (content.id === `live-tab-${ticker}`) {
+                    content.classList.add('active');
+                }
+            });
+
+            // Update the selected ticker label
+            const label = document.getElementById('selectedTickerLabel');
+            if (label) {
+                label.textContent = ticker.replace('.JK', '');
+            }
+
+            // Load 5M data for the selected ticker (on-demand)
+            await loadLiveDataForTicker(ticker);
         }
 
         // Change timeframe interval
@@ -1115,11 +1371,14 @@
             scrollTablesToBottom();
         }
 
-        // Scroll all table wrappers to bottom to show latest data
+        // Scroll table wrappers to bottom to show latest data (except watchlist table)
         function scrollTablesToBottom() {
             setTimeout(() => {
                 document.querySelectorAll('.table-wrapper').forEach(wrapper => {
-                    wrapper.scrollTop = wrapper.scrollHeight;
+                    // Don't auto-scroll the daily signals watchlist table - we want to see top (highest Diff)
+                    if (!wrapper.closest('.daily-signals-banner')) {
+                        wrapper.scrollTop = wrapper.scrollHeight;
+                    }
                 });
             }, 100); // Small delay to ensure DOM is rendered
         }
@@ -1229,7 +1488,7 @@
                                     <td class="${getScoreClass(row.Score_MA5)}">${row.MA_5.toFixed(2)}</td>
                                     <td class="${getScoreClass(row.Score_MA10)}">${row.MA_10.toFixed(2)}</td>
                                     <td class="${getRsiClass(row.RSI_Score, row.Score_RSI)}">${row.RSI_Score.toFixed(2)}</td>
-                                    <td class="${row.SuperTrend_Color === 'GREEN' ? 'green-bg' : 'red-bg'}">${row.SuperTrend} (${row.SuperTrend_Color})</td>
+                                    <td class="${row.SuperTrend_Color === 'GREEN' ? 'green-bg' : 'red-bg'}">${row.SuperTrend}</td>
                                     <td>${row.Vol_Osc.toFixed(2)}%</td>
                                     <td class="${getVolOscClass(row.Vol_Osc_Result)}">${row.Vol_Osc_Result}</td>
                                     <td class="${getIndicatorClass(row.Indicator)} tooltip">
@@ -1308,6 +1567,14 @@
             return score.toString();
         }
 
+        // Safe number formatting (handles NaN, null, undefined)
+        function safeFixed(value, decimals = 2) {
+            if (value === null || value === undefined || isNaN(value)) {
+                return 'N/A';
+            }
+            return Number(value).toFixed(decimals);
+        }
+
         // Get score CSS class
         function getScoreClass(score) {
             if (score > 0) return 'score-positive';
@@ -1378,6 +1645,9 @@
 
             try {
                 if (currentMode === 'live') {
+                    // Force refresh the watchlist cache
+                    console.log('Force refreshing watchlist cache...');
+                    await fetch('/api/watchlist/refresh');
                     await loadLiveMonitorData();
                 } else {
                     await fetch('/api/refresh');
@@ -1453,16 +1723,33 @@
             addBtn.textContent = 'Adding...';
 
             try {
-                const response = await fetch(`/api/add_stock/${ticker}`);
-                const data = await response.json();
+                // Different behavior based on current mode
+                if (currentMode === 'live') {
+                    // Add to watchlist
+                    const response = await fetch(`/api/watchlist/add/${ticker}`);
+                    const data = await response.json();
 
-                if (data.success) {
-                    showToast(`${ticker} added successfully!`, 'success');
-                    input.value = '';
-                    currentTab = ticker; // Switch to newly added stock
-                    await loadStockData();
+                    if (data.success) {
+                        showToast(`${data.ticker} added to watchlist!`, 'success');
+                        input.value = '';
+                        currentTab = data.ticker; // Switch to newly added stock
+                        await loadLiveMonitorData(); // Reload watchlist
+                    } else {
+                        showToast(data.error || 'Failed to add stock', 'error');
+                    }
                 } else {
-                    showToast(data.error || 'Failed to add stock', 'error');
+                    // Add to dashboard
+                    const response = await fetch(`/api/add_stock/${ticker}`);
+                    const data = await response.json();
+
+                    if (data.success) {
+                        showToast(`${ticker} added successfully!`, 'success');
+                        input.value = '';
+                        currentTab = ticker; // Switch to newly added stock
+                        await loadStockData();
+                    } else {
+                        showToast(data.error || 'Failed to add stock', 'error');
+                    }
                 }
             } catch (error) {
                 console.error('Error adding stock:', error);
