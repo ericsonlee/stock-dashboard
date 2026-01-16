@@ -124,10 +124,10 @@
             background: #2196F3;
             color: white;
             border: none;
-            padding: 10px 25px;
+            padding: 10px 20px;
             border-radius: 25px;
             cursor: pointer;
-            font-size: 1em;
+            font-size: 0.9em;
             transition: background 0.3s;
         }
 
@@ -138,6 +138,74 @@
         .refresh-btn:disabled {
             background: #ccc;
             cursor: not-allowed;
+        }
+
+        /* Auto-refresh controls */
+        .auto-refresh-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: #f5f5f5;
+            padding: 8px 15px;
+            border-radius: 25px;
+        }
+
+        .auto-refresh-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .auto-refresh-toggle input {
+            display: none;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 40px;
+            height: 22px;
+            background: #ccc;
+            border-radius: 11px;
+            transition: background 0.3s;
+        }
+
+        .toggle-switch::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 18px;
+            height: 18px;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.3s;
+        }
+
+        .auto-refresh-toggle input:checked + .toggle-switch {
+            background: #4CAF50;
+        }
+
+        .auto-refresh-toggle input:checked + .toggle-switch::after {
+            transform: translateX(18px);
+        }
+
+        .auto-refresh-label {
+            font-size: 0.85em;
+            color: #555;
+            font-weight: 500;
+        }
+
+        .auto-refresh-label.active {
+            color: #4CAF50;
+        }
+
+        .auto-refresh-interval {
+            font-size: 0.8em;
+            color: #888;
+            padding-left: 8px;
+            border-left: 1px solid #ddd;
         }
 
         /* Interval Selector */
@@ -927,7 +995,15 @@
                         {% endfor %}
                     </div>
                 </div>
-                <button class="refresh-btn" onclick="refreshData()">Refresh</button>
+                <div class="auto-refresh-container">
+                    <label class="auto-refresh-toggle" title="Toggle auto-refresh">
+                        <input type="checkbox" id="autoRefreshToggle" checked onchange="toggleAutoRefresh()">
+                        <span class="toggle-switch"></span>
+                    </label>
+                    <span id="autoRefreshLabel" class="auto-refresh-label active">Auto</span>
+                    <span class="auto-refresh-interval">2 min</span>
+                </div>
+                <button class="refresh-btn" onclick="refreshData()">Refresh Now</button>
             </div>
         </div>
 
@@ -941,6 +1017,7 @@
 
     <script>
         let autoRefreshInterval;
+        let autoRefreshEnabled = true; // Default to ON
         let currentTab = null;
         let currentTimeframe = '{{ current_interval }}';
         let currentMode = 'dashboard'; // 'dashboard' or 'live'
@@ -1653,16 +1730,16 @@
                     await fetch('/api/refresh');
                     await loadStockData();
                 }
-                button.textContent = 'Refreshed!';
+                button.textContent = 'Done!';
                 setTimeout(() => {
-                    button.textContent = 'Refresh';
+                    button.textContent = 'Refresh Now';
                     button.disabled = false;
-                }, 2000);
+                }, 1500);
             } catch (error) {
                 console.error('Error refreshing data:', error);
                 button.textContent = 'Error';
                 setTimeout(() => {
-                    button.textContent = 'Refresh';
+                    button.textContent = 'Refresh Now';
                     button.disabled = false;
                 }, 2000);
             }
@@ -1694,7 +1771,18 @@
 
         // Auto-refresh every 2 minutes, only during trading hours
         function startAutoRefresh() {
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+            }
+
+            if (!autoRefreshEnabled) {
+                console.log('Auto-refresh: Disabled');
+                return;
+            }
+
             autoRefreshInterval = setInterval(() => {
+                if (!autoRefreshEnabled) return;
+
                 if (isTradingHours()) {
                     console.log('Auto-refresh: Trading hours active, refreshing...');
                     if (currentMode === 'live') {
@@ -1706,6 +1794,37 @@
                     console.log('Auto-refresh: Outside trading hours, skipping refresh');
                 }
             }, 120000); // 2 minutes
+        }
+
+        // Toggle auto-refresh on/off
+        function toggleAutoRefresh() {
+            const toggle = document.getElementById('autoRefreshToggle');
+            const label = document.getElementById('autoRefreshLabel');
+
+            autoRefreshEnabled = toggle.checked;
+
+            if (autoRefreshEnabled) {
+                label.textContent = 'Auto';
+                label.classList.add('active');
+                startAutoRefresh();
+                console.log('Auto-refresh: Enabled');
+            } else {
+                label.textContent = 'Off';
+                label.classList.remove('active');
+                if (autoRefreshInterval) {
+                    clearInterval(autoRefreshInterval);
+                    autoRefreshInterval = null;
+                }
+                console.log('Auto-refresh: Disabled');
+            }
+        }
+
+        // Stop auto-refresh
+        function stopAutoRefresh() {
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+                autoRefreshInterval = null;
+            }
         }
 
         // Add a new stock
