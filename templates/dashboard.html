@@ -1796,18 +1796,40 @@
             }, 120000); // 2 minutes
         }
 
-        // Toggle auto-refresh on/off
-        function toggleAutoRefresh() {
+        // Toggle auto-refresh on/off (syncs with server for all users)
+        async function toggleAutoRefresh() {
             const toggle = document.getElementById('autoRefreshToggle');
             const label = document.getElementById('autoRefreshLabel');
 
-            autoRefreshEnabled = toggle.checked;
+            try {
+                // Send toggle request to server
+                const response = await fetch('/api/auto_refresh/toggle', { method: 'POST' });
+                const data = await response.json();
 
-            if (autoRefreshEnabled) {
+                if (data.success) {
+                    autoRefreshEnabled = data.enabled;
+                    updateAutoRefreshUI(data.enabled);
+                    console.log('Auto-refresh:', data.enabled ? 'Enabled' : 'Disabled', '(server)');
+                }
+            } catch (error) {
+                console.error('Error toggling auto-refresh:', error);
+                // Revert toggle on error
+                toggle.checked = autoRefreshEnabled;
+            }
+        }
+
+        // Update auto-refresh UI based on state
+        function updateAutoRefreshUI(enabled) {
+            const toggle = document.getElementById('autoRefreshToggle');
+            const label = document.getElementById('autoRefreshLabel');
+
+            toggle.checked = enabled;
+            autoRefreshEnabled = enabled;
+
+            if (enabled) {
                 label.textContent = 'Auto';
                 label.classList.add('active');
                 startAutoRefresh();
-                console.log('Auto-refresh: Enabled');
             } else {
                 label.textContent = 'Off';
                 label.classList.remove('active');
@@ -1815,8 +1837,35 @@
                     clearInterval(autoRefreshInterval);
                     autoRefreshInterval = null;
                 }
-                console.log('Auto-refresh: Disabled');
             }
+        }
+
+        // Fetch auto-refresh state from server
+        async function fetchAutoRefreshState() {
+            try {
+                const response = await fetch('/api/auto_refresh');
+                const data = await response.json();
+                updateAutoRefreshUI(data.enabled);
+                console.log('Auto-refresh state from server:', data.enabled ? 'ON' : 'OFF');
+            } catch (error) {
+                console.error('Error fetching auto-refresh state:', error);
+            }
+        }
+
+        // Periodically check server state (every 30 seconds) to sync across users
+        function startAutoRefreshSync() {
+            setInterval(async () => {
+                try {
+                    const response = await fetch('/api/auto_refresh');
+                    const data = await response.json();
+                    if (data.enabled !== autoRefreshEnabled) {
+                        console.log('Auto-refresh state changed by another user:', data.enabled ? 'ON' : 'OFF');
+                        updateAutoRefreshUI(data.enabled);
+                    }
+                } catch (error) {
+                    // Silently fail - don't spam console
+                }
+            }, 30000); // Check every 30 seconds
         }
 
         // Stop auto-refresh
@@ -1925,16 +1974,21 @@
         }
 
         // Initial load - ensure dashboard mode is active
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', async function() {
             // Reset to dashboard mode on page load
             currentMode = 'dashboard';
             document.getElementById('dashboardModeBtn').classList.add('active');
             document.getElementById('liveMonitorModeBtn').classList.remove('active');
             document.getElementById('intervalSelector').style.display = 'flex';
 
+            // Fetch auto-refresh state from server first
+            await fetchAutoRefreshState();
+
+            // Start sync to detect changes by other users
+            startAutoRefreshSync();
+
             // Load dashboard data
             loadStockData();
-            startAutoRefresh();
         });
     </script>
 </body>

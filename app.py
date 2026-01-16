@@ -25,6 +25,13 @@ live_monitor_cache = {
     'cache_duration': 120  # Cache for 2 minutes
 }
 
+# Global auto-refresh state (shared across all users)
+auto_refresh_state = {
+    'enabled': True,  # Default to ON
+    'last_changed': None,
+    'changed_by': None
+}
+
 # Indonesian timezone (WIB = UTC+7)
 WIB = pytz.timezone('Asia/Jakarta')
 
@@ -398,6 +405,40 @@ def refresh_watchlist():
         'success': True,
         'message': f'Refreshed {len(WATCHLIST_TICKERS)} stocks',
         'last_update': get_wib_time()
+    })
+
+@app.route('/api/auto_refresh')
+def get_auto_refresh_state():
+    """Get the current global auto-refresh state"""
+    if not check_auth():
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    return jsonify({
+        'enabled': auto_refresh_state['enabled'],
+        'last_changed': auto_refresh_state['last_changed'],
+        'changed_by': auto_refresh_state['changed_by']
+    })
+
+@app.route('/api/auto_refresh/toggle', methods=['POST'])
+def toggle_auto_refresh():
+    """Toggle the global auto-refresh state (affects all users)"""
+    if not check_auth():
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    global auto_refresh_state
+
+    # Toggle the state
+    auto_refresh_state['enabled'] = not auto_refresh_state['enabled']
+    auto_refresh_state['last_changed'] = get_wib_time()
+    auto_refresh_state['changed_by'] = request.remote_addr
+
+    status = 'enabled' if auto_refresh_state['enabled'] else 'disabled'
+    print(f"[{get_wib_time()}] Auto-refresh {status} by {request.remote_addr}")
+
+    return jsonify({
+        'success': True,
+        'enabled': auto_refresh_state['enabled'],
+        'last_changed': auto_refresh_state['last_changed']
     })
 
 @app.route('/api/watchlist/add/<ticker>')
