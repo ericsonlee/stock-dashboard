@@ -1416,24 +1416,18 @@
                 return bDiff - aDiff;
             });
 
-            // Set current tab to first sorted ticker if not set
-            if (!currentTab || !tickers.includes(currentTab)) {
-                currentTab = sortedTickers[0];
-            }
-
             // Create watchlist table rows
             let tableRows = '';
             for (const ticker of sortedTickers) {
                 const tickerData = data.data[ticker];
-                const isSelected = ticker === currentTab ? 'selected' : '';
 
                 if (tickerData && tickerData.latest) {
                     const row = tickerData.latest;
                     tableRows += `
-                        <tr class="${isSelected}" data-ticker="${ticker}" onclick="selectCustomTicker('${ticker}')">
+                        <tr data-ticker="${ticker}">
                             <td>
                                 <strong>${ticker.replace('.JK', '')}</strong>
-                                <button class="remove-ticker-btn" onclick="event.stopPropagation(); removeCustomTicker('${ticker}')" title="Remove ${ticker}">&times;</button>
+                                <button class="remove-ticker-btn" onclick="removeCustomTicker('${ticker}')" title="Remove ${ticker}">&times;</button>
                             </td>
                             <td>${safeFixed(row.Price)}</td>
                             <td class="${getScoreClass(row.Score_MA5)}">${safeFixed(row.MA_5)}</td>
@@ -1448,10 +1442,10 @@
                     `;
                 } else {
                     tableRows += `
-                        <tr class="${isSelected}" data-ticker="${ticker}" onclick="selectCustomTicker('${ticker}')">
+                        <tr data-ticker="${ticker}">
                             <td>
                                 <strong>${ticker.replace('.JK', '')}</strong>
-                                <button class="remove-ticker-btn" onclick="event.stopPropagation(); removeCustomTicker('${ticker}')" title="Remove ${ticker}">&times;</button>
+                                <button class="remove-ticker-btn" onclick="removeCustomTicker('${ticker}')" title="Remove ${ticker}">&times;</button>
                             </td>
                             <td colspan="9" class="no-data">${tickerData?.error || 'No data available'}</td>
                         </tr>
@@ -1464,7 +1458,7 @@
                     <div class="daily-signals-title">
                         Custom Watchlist <span class="badge">${customTimeframe.toUpperCase()} Indicator</span> <span class="badge" style="background: #4CAF50;">${sortedTickers.length} stocks</span>
                     </div>
-                    <div class="table-wrapper" style="max-height: 400px;">
+                    <div class="table-wrapper" style="max-height: 600px;">
                         <table>
                             <thead>
                                 <tr>
@@ -1488,125 +1482,7 @@
                 </div>
             `;
 
-            // Create detailed view for selected ticker
-            let detailSection = '';
-            const selectedData = data.data[currentTab];
-            if (selectedData && selectedData.data && selectedData.data.length > 0) {
-                detailSection = `
-                    <div class="live-data-section">
-                        <div class="live-data-header">
-                            <div class="live-data-title">
-                                ${currentTab.replace('.JK', '')} <span class="live-badge">${customTimeframe.toUpperCase()}</span> - Detailed View
-                            </div>
-                        </div>
-                        <div class="tab-content active" style="padding: 20px;">
-                            ${createCustomDetailContent(selectedData)}
-                        </div>
-                    </div>
-                `;
-            }
-
-            container.innerHTML = watchlistSection + detailSection;
-
-            // Store data globally for ticker selection
-            window.customDashboardData = data;
-        }
-
-        // Create detailed content for selected custom ticker
-        function createCustomDetailContent(tickerData) {
-            const latestData = tickerData.latest;
-            if (!latestData) return '<div class="no-data">No data available</div>';
-
-            const summaryHTML = `
-                <div class="summary-stats">
-                    <div class="stat-box">
-                        <div class="stat-label">Price</div>
-                        <div class="stat-value">${safeFixed(latestData.Price)}</div>
-                    </div>
-                    <div class="stat-box">
-                        <div class="stat-label">MA 5</div>
-                        <div class="stat-value" style="color: ${latestData.Score_MA5 > 0 ? '#4CAF50' : latestData.Score_MA5 < 0 ? '#f44336' : '#FFC107'}">${safeFixed(latestData.MA_5)}</div>
-                    </div>
-                    <div class="stat-box">
-                        <div class="stat-label">MA 10</div>
-                        <div class="stat-value" style="color: ${latestData.Score_MA10 > 0 ? '#4CAF50' : latestData.Score_MA10 < 0 ? '#f44336' : '#FFC107'}">${safeFixed(latestData.MA_10)}</div>
-                    </div>
-                    <div class="stat-box">
-                        <div class="stat-label">RSI</div>
-                        <div class="stat-value" style="color: ${latestData.Score_RSI > 0 ? '#4CAF50' : latestData.Score_RSI < 0 ? '#f44336' : '#FFC107'}">${safeFixed(latestData.RSI_Score)}</div>
-                    </div>
-                    <div class="stat-box">
-                        <div class="stat-label">SuperTrend</div>
-                        <div class="stat-value" style="color: ${latestData.SuperTrend_Color === 'GREEN' ? '#4CAF50' : '#f44336'}">${latestData.SuperTrend_Color || 'N/A'}</div>
-                    </div>
-                    <div class="stat-box">
-                        <div class="stat-label">Indicator</div>
-                        <div class="stat-value" style="color: ${latestData.Indicator > 0 ? '#4CAF50' : latestData.Indicator < 0 ? '#f44336' : '#FFC107'}; font-size: 1.5em;">${latestData.Indicator ?? 'N/A'}</div>
-                    </div>
-                    <div class="stat-box">
-                        <div class="stat-label">Diff</div>
-                        <div class="stat-value" style="color: ${latestData.Indicator_Diff > 0 ? '#4CAF50' : latestData.Indicator_Diff < 0 ? '#f44336' : '#FFC107'}; font-size: 1.5em;">${latestData.Indicator_Diff > 0 ? '+' : ''}${latestData.Indicator_Diff ?? 'N/A'}</div>
-                    </div>
-                </div>
-            `;
-
-            const tableHTML = `
-                <div class="table-wrapper">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Date/Time</th>
-                                <th>Price</th>
-                                <th>MA 5</th>
-                                <th>MA 10</th>
-                                <th>RSI</th>
-                                <th>SuperTrend</th>
-                                <th>Vol Osc %</th>
-                                <th>Vol Osc Result</th>
-                                <th>Indicator</th>
-                                <th>Diff</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${tickerData.data.map(row => `
-                                <tr>
-                                    <td>${row.Date || 'N/A'}</td>
-                                    <td>${safeFixed(row.Price)}</td>
-                                    <td class="${getScoreClass(row.Score_MA5)}">${safeFixed(row.MA_5)}</td>
-                                    <td class="${getScoreClass(row.Score_MA10)}">${safeFixed(row.MA_10)}</td>
-                                    <td class="${getRsiClass(row.RSI_Score, row.Score_RSI)}">${safeFixed(row.RSI_Score)}</td>
-                                    <td class="${row.SuperTrend_Color === 'GREEN' ? 'green-bg' : 'red-bg'}">${row.SuperTrend || 'N/A'}</td>
-                                    <td>${safeFixed(row.Vol_Osc)}%</td>
-                                    <td class="${getVolOscClass(row.Vol_Osc_Result)}">${row.Vol_Osc_Result || 'N/A'}</td>
-                                    <td class="${getIndicatorClass(row.Indicator)}">${row.Indicator ?? 'N/A'}</td>
-                                    <td class="${getIndicatorDiffClass(row.Indicator_Diff)}">${row.Indicator_Diff > 0 ? '+' : ''}${row.Indicator_Diff ?? 'N/A'}</td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
-                </div>
-            `;
-
-            return summaryHTML + tableHTML;
-        }
-
-        // Select ticker in custom dashboard
-        async function selectCustomTicker(ticker) {
-            currentTab = ticker;
-
-            // Update row selection
-            document.querySelectorAll('.daily-signals-banner tr[data-ticker]').forEach(row => {
-                row.classList.remove('selected');
-                if (row.dataset.ticker === ticker) {
-                    row.classList.add('selected');
-                }
-            });
-
-            // Update detail view if we have cached data
-            if (window.customDashboardData) {
-                displayCustomDashboard(window.customDashboardData);
-                scrollTablesToBottom();
-            }
+            container.innerHTML = watchlistSection;
         }
 
         // Change custom dashboard timeframe
