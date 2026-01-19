@@ -62,7 +62,7 @@ def is_trading_hours():
 # Dashboard tickers (for 1h/5m detailed view)
 DASHBOARD_TICKERS = ["RATU.JK", "IMPC.JK", "BKSL.JK"]
 
-# Live Monitor watchlist - Top 100 IDX stocks (1D data only, fetched once daily)
+# Live Monitor watchlist - IDX stocks (1D data only, fetched once daily)
 WATCHLIST_TICKERS = [
     # Original watchlist
     "RATU.JK", "IMPC.JK", "BKSL.JK",
@@ -101,7 +101,25 @@ WATCHLIST_TICKERS = [
     # Transportation & Logistics
     "BIRD.JK", "ASSA.JK", "SMDR.JK", "TMAS.JK",
     # Others / Diversified
-    "UNTR.JK", "ESSA.JK", "SRTG.JK", "ARTO.JK", "AMMN.JK", "CUAN.JK", "FILM.JK", "PGEO.JK"
+    "UNTR.JK", "ESSA.JK", "SRTG.JK", "ARTO.JK", "AMMN.JK", "CUAN.JK", "FILM.JK", "PGEO.JK",
+    # Small Cap / Second Liner Stocks
+    "KPIG.JK", "PANI.JK", "PNGO.JK", "BELI.JK", "CBDK.JK", "BUAH.JK",
+    "HELI.JK", "JARR.JK", "LABA.JK", "WIFI.JK", "DCII.JK", "EDGE.JK",
+    "CBPE.JK", "GGRP.JK", "DRMA.JK", "MSIN.JK", "SOHO.JK", "KEJU.JK",
+    "CASH.JK", "ARMY.JK", "AVIA.JK", "HAIS.JK", "TAPG.JK", "SGER.JK",
+    "STRK.JK", "SOSS.JK", "BOBA.JK", "FOOD.JK", "BEER.JK", "KRYA.JK",
+    "CMRY.JK", "KING.JK", "NICL.JK", "PGUN.JK", "NFCX.JK", "LUCK.JK",
+    "ATIC.JK", "BMHS.JK", "COAL.JK", "INET.JK", "KIOS.JK", "MPRO.JK",
+    "OILS.JK", "REAL.JK", "SHIP.JK", "TECH.JK", "WEGE.JK", "ZONE.JK",
+    # More Small Caps - Various Sectors
+    "AGII.JK", "BAJA.JK", "BATA.JK", "BELL.JK", "BIMA.JK", "BOLT.JK",
+    "BOSS.JK", "BTEK.JK", "CARS.JK", "CITY.JK", "CLPI.JK", "CMNP.JK",
+    "COCO.JK", "CPRI.JK", "DAYA.JK", "DIVA.JK", "DPNS.JK", "DUTI.JK",
+    "ECII.JK", "ELPI.JK", "FIRE.JK", "FORU.JK", "FUJI.JK", "GDYR.JK",
+    "GEMA.JK", "GOLD.JK", "GOOD.JK", "GPRA.JK", "GTBO.JK", "HERO.JK",
+    "HOME.JK", "HOTL.JK", "HUMI.JK", "IBST.JK", "IDEA.JK", "IFII.JK",
+    "IIKP.JK", "IKBI.JK", "INAF.JK", "INAI.JK", "INDS.JK", "INOV.JK",
+    "IPCC.JK", "ITIC.JK", "JAWA.JK", "JKON.JK", "JMAS.JK", "JSKY.JK"
 ]
 
 # For backward compatibility

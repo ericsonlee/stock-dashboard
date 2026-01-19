@@ -1241,18 +1241,25 @@
             const container = document.getElementById('stocksContainer');
             const tickers = data.tickers;
 
-            // Sort tickers by Indicator_Diff (biggest first)
-            const sortedTickers = [...tickers].sort((a, b) => {
-                const aInfo = data.daily_signals[a];
-                const bInfo = data.daily_signals[b];
-                const aDiff = (aInfo.data && aInfo.data.length > 0) ? aInfo.data[aInfo.data.length - 1].Indicator_Diff : 0;
-                const bDiff = (bInfo.data && bInfo.data.length > 0) ? bInfo.data[bInfo.data.length - 1].Indicator_Diff : 0;
-                return bDiff - aDiff; // Descending order (biggest first)
-            });
+            // Sort tickers by Indicator_Diff (biggest first) and filter only positive Diff
+            const sortedTickers = [...tickers]
+                .filter(ticker => {
+                    const info = data.daily_signals[ticker];
+                    if (!info || !info.data || info.data.length === 0) return false;
+                    const diff = info.data[info.data.length - 1].Indicator_Diff;
+                    return diff !== null && diff !== undefined && diff > 0;
+                })
+                .sort((a, b) => {
+                    const aInfo = data.daily_signals[a];
+                    const bInfo = data.daily_signals[b];
+                    const aDiff = (aInfo.data && aInfo.data.length > 0) ? aInfo.data[aInfo.data.length - 1].Indicator_Diff : 0;
+                    const bDiff = (bInfo.data && bInfo.data.length > 0) ? bInfo.data[bInfo.data.length - 1].Indicator_Diff : 0;
+                    return bDiff - aDiff; // Descending order (biggest first)
+                });
 
             // Always default to first sorted ticker (highest Diff) on initial load
             // Only keep current selection if user explicitly selected a ticker
-            if (!currentTab || !tickers.includes(currentTab)) {
+            if (!currentTab || !sortedTickers.includes(currentTab)) {
                 currentTab = sortedTickers[0];
             }
 
@@ -1291,7 +1298,7 @@
             const dailyStatsSection = `
                 <div class="daily-signals-banner">
                     <div class="daily-signals-title">
-                        IDX Stocks <span class="badge">Latest 1D Indicator</span> <span class="badge" style="background: #4CAF50;">${sortedTickers.length} stocks</span>
+                        IDX Stocks <span class="badge">Latest 1D Indicator</span> <span class="badge" style="background: #4CAF50;">${sortedTickers.length} positive</span> <span class="badge" style="background: #666;">of ${tickers.length} total</span>
                     </div>
                     <div class="table-wrapper" style="max-height: 400px;">
                         <table>
