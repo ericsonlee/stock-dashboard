@@ -112,6 +112,20 @@ INTERVALS = {
 # Initialize stock fetcher
 fetcher = StockDataFetcher()
 
+def convert_nan_to_none(data):
+    """Convert NaN values to None for valid JSON serialization.
+    Works with both list of dicts (records) and single dict."""
+    if isinstance(data, list):
+        for record in data:
+            for key, value in record.items():
+                if pd.isna(value):
+                    record[key] = None
+    elif isinstance(data, dict):
+        for key, value in data.items():
+            if pd.isna(value):
+                data[key] = None
+    return data
+
 def fetch_all_stocks(interval='1d', bars=DEFAULT_BARS):
     """Fetch data for all tickers with specified interval"""
     global stock_data_cache, last_update_time, current_interval
@@ -122,8 +136,10 @@ def fetch_all_stocks(interval='1d', bars=DEFAULT_BARS):
         try:
             data = fetcher.get_stock_data(ticker, bars=bars, interval=interval)
             if data is not None:
+                records = data.to_dict('records')
+                convert_nan_to_none(records)
                 stock_data_cache[ticker] = {
-                    'data': data.to_dict('records'),
+                    'data': records,
                     'ticker': ticker,
                     'interval': interval,
                     'last_update': get_wib_time()
@@ -274,8 +290,10 @@ def add_stock(ticker):
 
         # Add to tickers list and cache
         TICKERS.append(ticker)
+        records = data.to_dict('records')
+        convert_nan_to_none(records)
         stock_data_cache[ticker] = {
-            'data': data.to_dict('records'),
+            'data': records,
             'ticker': ticker,
             'interval': current_interval,
             'last_update': get_wib_time()
@@ -353,6 +371,7 @@ def get_watchlist_data():
             if daily_df is not None and not daily_df.empty:
                 # Only send the latest row for the watchlist table
                 latest_row = daily_df.iloc[-1].to_dict()
+                convert_nan_to_none(latest_row)
                 daily_signals[ticker] = {
                     'data': [latest_row],
                     'ticker': ticker,
@@ -530,8 +549,10 @@ def get_live_data(ticker):
     try:
         live_df = fetcher.get_stock_data(ticker, bars=30, interval='5m')
         if live_df is not None and not live_df.empty:
+            records = live_df.to_dict('records')
+            convert_nan_to_none(records)
             response_data = {
-                'data': live_df.to_dict('records'),
+                'data': records,
                 'ticker': ticker,
                 'interval': '5m',
                 'last_update': get_wib_time()
