@@ -32,6 +32,13 @@ auto_refresh_state = {
     'changed_by': None
 }
 
+# Custom Dashboard watchlist (user's personal watchlist)
+custom_watchlist = {
+    'tickers': [],  # User's custom tickers
+    'data': {},     # Cached data per ticker per timeframe
+    'last_update': None
+}
+
 # Indonesian timezone (WIB = UTC+7)
 WIB = pytz.timezone('Asia/Jakarta')
 
@@ -99,7 +106,7 @@ WATCHLIST_TICKERS = [
 
 # For backward compatibility
 TICKERS = DASHBOARD_TICKERS
-UPDATE_INTERVAL = 300  # Update every 5 minutes
+UPDATE_INTERVAL = 600  # Update every 10 minutes (reduced to save Railway credits)
 DEFAULT_BARS = 50  # Number of bars to show
 
 # Available intervals
@@ -520,6 +527,150 @@ def add_to_watchlist(ticker):
 
 # Cache for individual ticker 5M data
 live_data_cache = {}
+
+# ============== CUSTOM DASHBOARD API ENDPOINTS ==============
+
+@app.route('/api/custom/tickers')
+def get_custom_tickers():
+    """Get list of custom watchlist tickers"""
+    if not check_auth():
+        return jsonify({'error': 'Unauthorized'}), 401
+    return jsonify({
+        'tickers': custom_watchlist['tickers'],
+        'last_update': custom_watchlist['last_update']
+    })
+
+@app.route('/api/custom/add/<ticker>')
+def add_custom_ticker(ticker):
+    """Add a ticker to custom watchlist"""
+    if not check_auth():
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    global custom_watchlist
+
+    # Normalize ticker
+    ticker = ticker.upper()
+    if not ticker.endswith('.JK') and '.' not in ticker and '-' not in ticker:
+        ticker = ticker + '.JK'
+
+    if ticker in custom_watchlist['tickers']:
+        return jsonify({'success': False, 'error': f'{ticker} already in custom watchlist'}), 400
+
+    try:
+        # Verify ticker exists by fetching data
+        test_df = fetcher.get_stock_data(ticker, bars=5, interval='1d')
+        if test_df is None or test_df.empty:
+            return jsonify({'success': False, 'error': f'No data found for {ticker}'}), 404
+
+        custom_watchlist['tickers'].append(ticker)
+        custom_watchlist['last_update'] = get_wib_time()
+
+        print(f"[{get_wib_time()}] Added {ticker} to custom watchlist")
+        return jsonify({
+            'success': True,
+            'ticker': ticker,
+            'tickers': custom_watchlist['tickers']
+        })
+    except Exception as e:
+        print(f"  ✗ Error adding {ticker} to custom watchlist: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/custom/remove/<ticker>')
+def remove_custom_ticker(ticker):
+    """Remove a ticker from custom watchlist"""
+    if not check_auth():
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    global custom_watchlist
+
+    ticker = ticker.upper()
+    if not ticker.endswith('.JK') and '.' not in ticker and '-' not in ticker:
+        ticker = ticker + '.JK'
+
+    if ticker not in custom_watchlist['tickers']:
+        return jsonify({'success': False, 'error': f'{ticker} not in custom watchlist'}), 404
+
+    custom_watchlist['tickers'].remove(ticker)
+    # Also remove from data cache
+    if ticker in custom_watchlist['data']:
+        del custom_watchlist['data'][ticker]
+
+    custom_watchlist['last_update'] = get_wib_time()
+
+    print(f"[{get_wib_time()}] Removed {ticker} from custom watchlist")
+    return jsonify({
+        'success': True,
+        'ticker': ticker,
+        'tickers': custom_watchlist['tickers']
+    })
+
+@app.route('/api/custom/data/<interval>')
+def get_custom_data(interval):
+    """Get indicator data for all custom tickers at specified interval (5m, 1h, 1d)"""
+    if not check_auth():
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    if interval not in ['5m', '1h', '1d']:
+        return jsonify({'error': 'Invalid interval. Use 5m, 1h, or 1d'}), 400
+
+    if not custom_watchlist['tickers']:
+        return jsonify({
+            'data': {},
+            'tickers': [],
+            'interval': interval,
+            'last_update': get_wib_time()
+        })
+
+    print(f"[{get_wib_time()}] Fetching {interval} data for {len(custom_watchlist['tickers'])} custom tickers...")
+
+    result = {}
+    for ticker in custom_watchlist['tickers']:
+        try:
+            df = fetcher.get_stock_data(ticker, bars=30, interval=interval)
+            if df is not None and not df.empty:
+                # Get latest row
+                latest_row = df.iloc[-1].to_dict()
+                convert_nan_to_none(latest_row)
+
+                # Get all rows for detailed view
+                records = df.to_dict('records')
+                convert_nan_to_none(records)
+
+                result[ticker] = {
+                    'data': records,
+                    'latest': latest_row,
+                    'ticker': ticker,
+                    'interval': interval,
+                    'last_update': get_wib_time()
+                }
+                print(f"  ✓ Custom: {ticker} ({interval})")
+            else:
+                result[ticker] = {
+                    'data': [],
+                    'latest': None,
+                    'ticker': ticker,
+                    'interval': interval,
+                    'error': 'No data available'
+                }
+                print(f"  ✗ Custom: {ticker} (no data)")
+        except Exception as e:
+            result[ticker] = {
+                'data': [],
+                'latest': None,
+                'ticker': ticker,
+                'interval': interval,
+                'error': str(e)
+            }
+            print(f"  ✗ Custom: {ticker}: {e}")
+
+    return jsonify({
+        'data': result,
+        'tickers': custom_watchlist['tickers'],
+        'interval': interval,
+        'last_update': get_wib_time()
+    })
+
+# ============== END CUSTOM DASHBOARD API ==============
 
 @app.route('/api/live_data/<ticker>')
 def get_live_data(ticker):
